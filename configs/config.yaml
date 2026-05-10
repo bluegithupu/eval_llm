@@ -1,0 +1,25 @@
+server:
+  port: 3100
+  timeout: 30s
+
+database:
+  host: localhost
+  port: 3105
+  name: evaluations
+  user: eval_user
+  password: eval_pass
+  max_connections: 25
+
+redis:
+  host: localhost
+  port: 3106
+  ttl: 24h
+
+kubernetes:
+  namespace: llm-eval
+  job_timeout: 7200s
+  job_retries: 3
+
+evaluation:
+  container_image: opencompass:latest
+  work_dir: /tmp/opencompass_runs
