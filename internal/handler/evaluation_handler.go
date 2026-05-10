@@ -316,6 +316,15 @@ func (h *EvaluationHandler) ListEvaluations(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GetEvaluationStatusResponse represents the response for getting evaluation status
+type GetEvaluationStatusResponse struct {
+	ID          string                 `json:"id"`
+	Status      model.EvaluationStatus `json:"status"`
+	Progress    int                    `json:"progress"`
+	Error       string                 `json:"error,omitempty"`
+	CancelledAt string                 `json:"cancelled_at,omitempty"`
+}
+
 // GetEvaluation handles GET /api/v1/evaluations/:id
 // Returns task details including id, model, dataset, status, config, created_at
 // Handles not found (404) and invalid UUID format (400)
@@ -374,6 +383,59 @@ func (h *EvaluationHandler) GetEvaluation(c *gin.Context) {
 		Config:    eval.Config,
 		Progress:  eval.Progress,
 		CreatedAt: eval.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// GetEvaluationStatus handles GET /api/v1/evaluations/:id/status
+// Returns current status (pending/running/completed/failed/cancelled) and progress (0-100)
+// Handles not found (404), invalid UUID format (400)
+func (h *EvaluationHandler) GetEvaluationStatus(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get ID from path parameter
+	id := c.Param("id")
+
+	// Validate UUID format (VAL-API-014 - invalid UUID returns 400)
+	if _, err := uuid.Parse(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid evaluation ID format: must be a valid UUID",
+		})
+		return
+	}
+
+	// Get evaluation from repository (VAL-API-014)
+	eval, err := h.evalRepo.GetByID(ctx, id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			// Task not found
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("evaluation not found: %s", id),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve evaluation",
+		})
+		return
+	}
+
+	// Build response based on status (VAL-API-014, VAL-API-015, VAL-API-016, VAL-API-017, VAL-API-018, VAL-API-019)
+	response := GetEvaluationStatusResponse{
+		ID:       eval.ID,
+		Status:   eval.Status,
+		Progress: eval.Progress,
+	}
+
+	// Add error field for failed status (VAL-API-018)
+	if eval.Status == model.StatusFailed && eval.ErrorMessage != "" {
+		response.Error = eval.ErrorMessage
+	}
+
+	// Add cancelled_at for cancelled status (VAL-API-019)
+	if eval.Status == model.StatusCancelled && eval.CompletedAt != nil {
+		response.CancelledAt = eval.CompletedAt.Format("2006-01-02T15:04:05Z07:00")
 	}
 
 	c.JSON(http.StatusOK, response)

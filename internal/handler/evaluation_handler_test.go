@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/eval_llm/backend/internal/model"
 	"github.com/eval_llm/backend/internal/repository"
@@ -162,6 +163,7 @@ func setupEvalTestRouter(handler *EvaluationHandler) *gin.Engine {
 	router.POST("/api/v1/evaluations", handler.CreateEvaluation)
 	router.GET("/api/v1/evaluations", handler.ListEvaluations)
 	router.GET("/api/v1/evaluations/:id", handler.GetEvaluation)
+	router.GET("/api/v1/evaluations/:id/status", handler.GetEvaluationStatus)
 	return router
 }
 
@@ -803,4 +805,294 @@ func TestGetEvaluation_AllStatusTypes(t *testing.T) {
 			mockDatasetRepo.AssertExpectations(t)
 		})
 	}
+}
+
+// TestGetEvaluationStatus_ValidID tests VAL-API-014
+func TestGetEvaluationStatus_ValidID(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusRunning,
+		Progress: 50,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify response has status and progress fields (VAL-API-014)
+	assert.Equal(t, evalID, response["id"])
+	assert.Equal(t, "running", response["status"])
+	assert.Equal(t, float64(50), response["progress"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluationStatus_PendingState tests VAL-API-015
+func TestGetEvaluationStatus_PendingState(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusPending,
+		Progress: 0,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify pending state returns status=pending, progress=0 (VAL-API-015)
+	assert.Equal(t, "pending", response["status"])
+	assert.Equal(t, float64(0), response["progress"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluationStatus_RunningState tests VAL-API-016
+func TestGetEvaluationStatus_RunningState(t *testing.T) {
+	testCases := []struct {
+		name     string
+		progress int
+	}{
+		{"low_progress", 1},
+		{"mid_progress", 50},
+		{"high_progress", 99},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockEvalRepo := new(MockEvaluationRepository)
+			mockCache := new(MockStatusCache)
+			mockModelRepo := new(MockModelRepository)
+			mockDatasetRepo := new(MockDatasetRepository)
+
+			evalID := uuid.New().String()
+
+			eval := &model.Evaluation{
+				ID:       evalID,
+				Status:   model.StatusRunning,
+				Progress: tc.progress,
+			}
+
+			mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+			handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+			router := setupEvalTestRouter(handler)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			var response map[string]interface{}
+			json.Unmarshal(w.Body.Bytes(), &response)
+
+			// Verify running state returns status=running, progress 1-99 (VAL-API-016)
+			assert.Equal(t, "running", response["status"])
+			assert.Equal(t, float64(tc.progress), response["progress"])
+
+			mockEvalRepo.AssertExpectations(t)
+		})
+	}
+}
+
+// TestGetEvaluationStatus_CompletedState tests VAL-API-017
+func TestGetEvaluationStatus_CompletedState(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusCompleted,
+		Progress: 100,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify completed state returns status=completed, progress=100 (VAL-API-017)
+	assert.Equal(t, "completed", response["status"])
+	assert.Equal(t, float64(100), response["progress"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluationStatus_FailedState tests VAL-API-018
+func TestGetEvaluationStatus_FailedState(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+	errorMsg := "OpenCompass execution failed: out of memory"
+
+	eval := &model.Evaluation{
+		ID:           evalID,
+		Status:       model.StatusFailed,
+		Progress:     45,
+		ErrorMessage: errorMsg,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify failed state returns status=failed with error field (VAL-API-018)
+	assert.Equal(t, "failed", response["status"])
+	assert.Contains(t, response, "error")
+	assert.Equal(t, errorMsg, response["error"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluationStatus_CancelledState tests VAL-API-019
+func TestGetEvaluationStatus_CancelledState(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+	cancelledAt := time.Now().Add(-5 * time.Minute)
+
+	eval := &model.Evaluation{
+		ID:          evalID,
+		Status:      model.StatusCancelled,
+		Progress:    30,
+		CompletedAt: &cancelledAt,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify cancelled state returns status=cancelled with cancelled_at (VAL-API-019)
+	assert.Equal(t, "cancelled", response["status"])
+	assert.Contains(t, response, "cancelled_at")
+	assert.NotEmpty(t, response["cancelled_at"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluationStatus_NotFound tests VAL-API-014 (404 case)
+func TestGetEvaluationStatus_NotFound(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(nil, repository.ErrNotFound)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "not found")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluationStatus_InvalidUUID tests VAL-API-014 (400 case)
+func TestGetEvaluationStatus_InvalidUUID(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request with invalid UUID format
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/invalid-uuid/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "invalid")
+	assert.Contains(t, response["error"].(string), "UUID")
+
+	mockEvalRepo.AssertExpectations(t)
 }
