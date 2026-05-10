@@ -367,9 +367,31 @@ func TestGenerateConfig_InferencerSettings(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// Check for inferencer configuration
-	assert.Contains(t, config, "OpenICLInferencer")
+	// Check for inferencer configuration - MMLU uses PPLInferencer
+	assert.Contains(t, config, "PPLInferencer")
 	assert.Contains(t, config, "batch_size=4")
+}
+
+func TestGenerateConfig_HellaSwagInferencer(t *testing.T) {
+	cfg := &ConfigData{
+		EvalID:      "test-hellaswag-inferencer",
+		ModelName:   "gpt-4",
+		ModelType:   "openai",
+		ModelPath:   "gpt-4",
+		DatasetName: "HellaSwag",
+		DatasetPath: "datasets/hellaswag",
+		WorkDir:     "/tmp/opencompass",
+		BatchSize:   2,
+	}
+
+	g := &OpenCompassConfigGenerator{}
+	config, err := g.GenerateConfig(cfg)
+
+	require.NoError(t, err)
+
+	// HellaSwag uses GenInferencer for generation tasks
+	assert.Contains(t, config, "GenInferencer")
+	assert.Contains(t, config, "batch_size=2")
 }
 
 func TestGenerateConfig_DatasetConfig(t *testing.T) {

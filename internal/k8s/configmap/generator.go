@@ -185,28 +185,66 @@ models = [
 }
 
 // generateDatasetConfig generates the dataset configuration section
+// with dataset-specific inferencer settings (PPLInferencer for MMLU, GenInferencer for HellaSwag)
 func (g *OpenCompassConfigGenerator) generateDatasetConfig(cfg *ConfigData) string {
+	// Determine inferencer type based on dataset
+	inferencerType := "PPLInferencer"
+
+	switch cfg.DatasetName {
+	case "MMLU", "mmlu":
+		inferencerType = "PPLInferencer"
+	case "HellaSwag", "hellaswag":
+		inferencerType = "GenInferencer"
+	default:
+		// Default to PPLInferencer for multiple choice datasets
+		inferencerType = "PPLInferencer"
+	}
+
+	batchSize := cfg.BatchSize
+	if batchSize == 0 {
+		batchSize = 1
+	}
+
 	return fmt.Sprintf(`# Dataset Configuration
-# %s dataset`, cfg.DatasetName)
+# %s dataset
+dataset_cfg = dict(
+    dataset_name='%s',
+    dataset_path='%s',
+    inferencer=dict(type='%s', batch_size=%d),
+    evaluator=dict(type='AccEvaluator'),
+)`, cfg.DatasetName, cfg.DatasetName, cfg.DatasetPath, inferencerType, batchSize)
 }
 
 // generateInferencerConfig generates the inferencer configuration section
+// Note: Inferencer is now configured per-dataset in generateDatasetConfig
 func (g *OpenCompassConfigGenerator) generateInferencerConfig(cfg *ConfigData) string {
-	return fmt.Sprintf(`# Inferencer Configuration
-inferencer = dict(
-    type='OpenICLInferencer',
-    batch_size=%d,
-)`, cfg.BatchSize)
+	// Inferencer configuration is now per-dataset (see generateDatasetConfig)
+	// This function returns empty string to avoid duplication
+	return ""
 }
 
-// generateDatasetList generates the dataset list section
+// generateDatasetList generates the dataset list section with proper inferencer
 func (g *OpenCompassConfigGenerator) generateDatasetList(cfg *ConfigData) string {
+	// Determine inferencer type based on dataset
+	inferencerType := "PPLInferencer" // default for multiple choice
+	switch cfg.DatasetName {
+	case "HellaSwag", "hellaswag":
+		inferencerType = "GenInferencer"
+	}
+
+	batchSize := cfg.BatchSize
+	if batchSize == 0 {
+		batchSize = 1
+	}
+
 	return fmt.Sprintf(`dict(
         dataset_path='%s',
         dataset_name='%s',
         abbr='%s',
         type='OpenICLEvalTask',
-    )`, cfg.DatasetPath, cfg.DatasetName, cfg.DatasetName)
+        inferencer=dict(type='%s', batch_size=%d),
+        evaluator=dict(type='AccEvaluator'),
+    )`, cfg.DatasetPath, cfg.DatasetName, cfg.DatasetName, inferencerType, batchSize)
 }
 
 // validateConfig validates the configuration data
