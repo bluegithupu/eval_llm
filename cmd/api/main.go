@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,10 +13,19 @@ import (
 	"github.com/eval_llm/backend/internal/cache"
 	"github.com/eval_llm/backend/internal/config"
 	"github.com/eval_llm/backend/internal/handler"
+	"github.com/eval_llm/backend/internal/k8s"
+	"github.com/eval_llm/backend/internal/k8s/monitor"
 	"github.com/eval_llm/backend/internal/repository"
+	"github.com/eval_llm/backend/internal/service"
 )
 
 func main() {
+	// Set up structured logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	// Load configuration
 	cfg := config.Load()
 
@@ -47,11 +59,60 @@ func main() {
 	resultRepo := repository.NewResultRepository(db.Pool())
 	predictionRepo := repository.NewPredictionRepository(db.Pool())
 
+	// Initialize Kubernetes client (if available)
+	var k8sClient *k8s.Client
+	var jobMonitor *monitor.Monitor
+	var orchestrator *service.Orchestrator
+
+	k8sClient, err = k8s.NewClient(k8s.DefaultClientConfig())
+	if err != nil {
+		log.Printf("Warning: Failed to connect to Kubernetes: %v. Job execution will be disabled.", err)
+	} else {
+		log.Printf("Connected to Kubernetes namespace: %s", k8sClient.Namespace())
+
+		// Create event store and monitor for Job status tracking
+		eventStore := monitor.NewInMemoryEventStore()
+		jobMonitor = monitor.NewMonitor(
+			k8sClient.Clientset(),
+			evalRepo,
+			redisClient,
+			eventStore,
+			logger,
+			monitor.DefaultMonitorConfig(),
+		)
+
+		// Create the orchestrator that ties together Job creation, execution, and result collection
+		orchestratorCfg := service.DefaultOrchestratorConfig()
+		orchestrator = service.NewOrchestrator(
+			orchestratorCfg,
+			k8sClient,
+			evalRepo,
+			resultRepo,
+			predictionRepo,
+			jobMonitor,
+			logger,
+		)
+
+		// Start result collector in background
+		ctx := context.Background()
+		orchestrator.StartResultCollector(ctx)
+
+		log.Printf("Evaluation orchestrator initialized")
+	}
+
 	// Create health handler
 	healthHandler := handler.NewHealthHandler(db, redisClient)
 
-	// Create evaluation handler
-	evalHandler := handler.NewEvaluationHandler(evalRepo, redisClient, modelRepo, datasetRepo, resultRepo, predictionRepo)
+	// Create evaluation handler with orchestrator (may be nil if K8s unavailable)
+	evalHandler := handler.NewEvaluationHandler(
+		evalRepo,
+		redisClient,
+		modelRepo,
+		datasetRepo,
+		resultRepo,
+		predictionRepo,
+		orchestrator,
+	)
 
 	// Create models and datasets handlers
 	modelsHandler := handler.NewModelsHandler()

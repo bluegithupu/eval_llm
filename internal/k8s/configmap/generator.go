@@ -28,11 +28,11 @@ type ConfigData struct {
 
 // OpenCompassConfigGenerator generates OpenCompass MMEngine configuration files
 type OpenCompassConfigGenerator struct {
-	client *kubernetes.Clientset
+	client kubernetes.Interface
 }
 
 // NewOpenCompassConfigGenerator creates a new ConfigMap generator
-func NewOpenCompassConfigGenerator(client *kubernetes.Clientset) *OpenCompassConfigGenerator {
+func NewOpenCompassConfigGenerator(client kubernetes.Interface) *OpenCompassConfigGenerator {
 	return &OpenCompassConfigGenerator{
 		client: client,
 	}

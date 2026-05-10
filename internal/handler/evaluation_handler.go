@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,6 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// OrchestratorInterface defines the interface for evaluation orchestration
+type OrchestratorInterface interface {
+	StartEvaluation(ctx context.Context, eval *model.Evaluation, modelEntity *model.Model, datasetEntity *model.Dataset) error
+	CancelEvaluation(ctx context.Context, evalID string) error
+}
 
 // CreateEvaluationRequest represents the request body for creating an evaluation
 type CreateEvaluationRequest struct {
@@ -34,6 +41,28 @@ type EvaluationHandler struct {
 	datasetRepo    repository.DatasetRepository
 	resultRepo     repository.ResultRepository
 	predictionRepo repository.PredictionRepository
+	orchestrator   OrchestratorInterface
+}
+
+// NewEvaluationHandler creates a new evaluation handler
+func NewEvaluationHandler(
+	evalRepo repository.EvaluationRepository,
+	cache cache.StatusCache,
+	modelRepo repository.ModelRepository,
+	datasetRepo repository.DatasetRepository,
+	resultRepo repository.ResultRepository,
+	predictionRepo repository.PredictionRepository,
+	orchestrator OrchestratorInterface,
+) *EvaluationHandler {
+	return &EvaluationHandler{
+		evalRepo:       evalRepo,
+		cache:          cache,
+		modelRepo:      modelRepo,
+		datasetRepo:    datasetRepo,
+		resultRepo:     resultRepo,
+		predictionRepo: predictionRepo,
+		orchestrator:   orchestrator,
+	}
 }
 
 // ListEvaluationsResponse represents the response for listing evaluations
@@ -64,25 +93,6 @@ type GetEvaluationResponse struct {
 	Config    map[string]any         `json:"config"`
 	Progress  int                    `json:"progress"`
 	CreatedAt string                 `json:"created_at"`
-}
-
-// NewEvaluationHandler creates a new evaluation handler
-func NewEvaluationHandler(
-	evalRepo repository.EvaluationRepository,
-	cache cache.StatusCache,
-	modelRepo repository.ModelRepository,
-	datasetRepo repository.DatasetRepository,
-	resultRepo repository.ResultRepository,
-	predictionRepo repository.PredictionRepository,
-) *EvaluationHandler {
-	return &EvaluationHandler{
-		evalRepo:       evalRepo,
-		cache:          cache,
-		modelRepo:      modelRepo,
-		datasetRepo:    datasetRepo,
-		resultRepo:     resultRepo,
-		predictionRepo: predictionRepo,
-	}
 }
 
 // CreateEvaluation handles POST /api/v1/evaluations
@@ -211,7 +221,18 @@ func (h *EvaluationHandler) CreateEvaluation(c *gin.Context) {
 	// Set Redis status to pending
 	if err := h.cache.SetStatus(ctx, taskID, "pending"); err != nil {
 		// Log the error but don't fail - DB is authoritative
-		// In production, you'd want to log this properly
+	}
+
+	// Start the evaluation job using the orchestrator (if available)
+	if h.orchestrator != nil {
+		go func() {
+			startCtx := context.Background()
+			if err := h.orchestrator.StartEvaluation(startCtx, evaluation, modelEntity, datasetEntity); err != nil {
+				// Log error - the evaluation will remain in pending state
+				// In production, this would be logged properly
+				_ = err
+			}
+		}()
 	}
 
 	// Build response (VAL-API-001, VAL-API-002)
@@ -704,6 +725,17 @@ func (h *EvaluationHandler) CancelEvaluation(c *gin.Context) {
 	// Update Redis status to cancelled
 	if err := h.cache.SetStatus(ctx, id, string(model.StatusCancelled)); err != nil {
 		// Log error but don't fail - DB is authoritative
+	}
+
+	// Cancel the Kubernetes Job (if orchestrator is available)
+	if h.orchestrator != nil {
+		go func() {
+			cancelCtx := context.Background()
+			if err := h.orchestrator.CancelEvaluation(cancelCtx, id); err != nil {
+				// Log error but don't fail - DB is authoritative
+				_ = err
+			}
+		}()
 	}
 
 	// Return success (VAL-API-023: 200/204 for pending/running)
