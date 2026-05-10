@@ -19,15 +19,17 @@ const (
 
 // Evaluation represents an evaluation task
 type Evaluation struct {
-	ID          string           `json:"id"`
-	ModelID     string           `json:"model_id"`
-	DatasetIDs  []string         `json:"dataset_ids"`
-	Config      map[string]any   `json:"config"`
-	Status      EvaluationStatus `json:"status"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
-	StartedAt   *time.Time       `json:"started_at,omitempty"`
-	CompletedAt *time.Time       `json:"completed_at,omitempty"`
+	ID           string           `json:"id"`
+	ModelID      string           `json:"model_id"`
+	DatasetIDs   []string         `json:"dataset_ids"`
+	Config       map[string]any   `json:"config"`
+	Status       EvaluationStatus `json:"status"`
+	Progress     int              `json:"progress"`
+	ErrorMessage string           `json:"error_message,omitempty"`
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
+	StartedAt    *time.Time       `json:"started_at,omitempty"`
+	CompletedAt  *time.Time       `json:"completed_at,omitempty"`
 }
 
 // Model represents a supported model
