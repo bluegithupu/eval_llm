@@ -28,12 +28,12 @@ type CreateEvaluationResponse struct {
 
 // EvaluationHandler handles evaluation-related HTTP requests
 type EvaluationHandler struct {
-	evalRepo        repository.EvaluationRepository
-	cache           cache.StatusCache
-	modelRepo       repository.ModelRepository
-	datasetRepo     repository.DatasetRepository
-	resultRepo      repository.ResultRepository
-	predictionRepo  repository.PredictionRepository
+	evalRepo       repository.EvaluationRepository
+	cache          cache.StatusCache
+	modelRepo      repository.ModelRepository
+	datasetRepo    repository.DatasetRepository
+	resultRepo     repository.ResultRepository
+	predictionRepo repository.PredictionRepository
 }
 
 // ListEvaluationsResponse represents the response for listing evaluations
@@ -76,12 +76,12 @@ func NewEvaluationHandler(
 	predictionRepo repository.PredictionRepository,
 ) *EvaluationHandler {
 	return &EvaluationHandler{
-		evalRepo:        evalRepo,
-		cache:           cache,
-		modelRepo:       modelRepo,
-		datasetRepo:     datasetRepo,
-		resultRepo:      resultRepo,
-		predictionRepo:  predictionRepo,
+		evalRepo:       evalRepo,
+		cache:          cache,
+		modelRepo:      modelRepo,
+		datasetRepo:    datasetRepo,
+		resultRepo:     resultRepo,
+		predictionRepo: predictionRepo,
 	}
 }
 
@@ -462,7 +462,7 @@ type EvaluationResultItem struct {
 	DatasetID   string         `json:"dataset_id"`
 	DatasetName string         `json:"dataset_name"`
 	Accuracy    float64        `json:"accuracy"`
-	SampleCount int             `json:"sample_count"`
+	SampleCount int            `json:"sample_count"`
 	Metrics     map[string]any `json:"metrics,omitempty"`
 	Summary     string         `json:"summary,omitempty"`
 }
@@ -628,4 +628,81 @@ func (h *EvaluationHandler) GetResults(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// CancelEvaluationResponse represents the response for cancelling an evaluation
+type CancelEvaluationResponse struct {
+	ID     string                 `json:"id"`
+	Status model.EvaluationStatus `json:"status"`
+}
+
+// CancelEvaluation handles DELETE /api/v1/evaluations/:id
+// Cancels a pending or running evaluation task
+// Returns 200/204 on success, 409 for completed tasks, 404 for not found, 400 for invalid UUID
+func (h *EvaluationHandler) CancelEvaluation(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get ID from path parameter
+	id := c.Param("id")
+
+	// Validate UUID format (VAL-API-023 - invalid UUID returns 400)
+	if _, err := uuid.Parse(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid evaluation ID format: must be a valid UUID",
+		})
+		return
+	}
+
+	// Get evaluation from repository
+	eval, err := h.evalRepo.GetByID(ctx, id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			// Task not found (VAL-API-023 - 404 case)
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("evaluation not found: %s", id),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve evaluation",
+		})
+		return
+	}
+
+	// Check if task is already completed (VAL-API-024: 409 for completed tasks)
+	if eval.Status == model.StatusCompleted {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "cannot cancel completed evaluation",
+		})
+		return
+	}
+
+	// Check if task is already cancelled (VAL-API-023 - idempotent: return success)
+	if eval.Status == model.StatusCancelled {
+		// Return success for idempotent behavior
+		c.JSON(http.StatusOK, CancelEvaluationResponse{
+			ID:     eval.ID,
+			Status: model.StatusCancelled,
+		})
+		return
+	}
+
+	// Cancel the evaluation by updating status to cancelled
+	if err := h.evalRepo.Cancel(ctx, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to cancel evaluation",
+		})
+		return
+	}
+
+	// Update Redis status to cancelled
+	if err := h.cache.SetStatus(ctx, id, string(model.StatusCancelled)); err != nil {
+		// Log error but don't fail - DB is authoritative
+	}
+
+	// Return success (VAL-API-023: 200/204 for pending/running)
+	c.JSON(http.StatusOK, CancelEvaluationResponse{
+		ID:     id,
+		Status: model.StatusCancelled,
+	})
 }

@@ -45,6 +45,11 @@ func (m *MockEvaluationRepository) UpdateStatus(ctx context.Context, id string, 
 	return args.Error(0)
 }
 
+func (m *MockEvaluationRepository) Cancel(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockEvaluationRepository) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
@@ -224,6 +229,7 @@ func setupEvalTestRouter(handler *EvaluationHandler) *gin.Engine {
 	router.GET("/api/v1/evaluations/:id", handler.GetEvaluation)
 	router.GET("/api/v1/evaluations/:id/status", handler.GetEvaluationStatus)
 	router.GET("/api/v1/evaluations/:id/results", handler.GetResults)
+	router.DELETE("/api/v1/evaluations/:id", handler.CancelEvaluation)
 	return router
 }
 
@@ -1460,4 +1466,211 @@ func TestGetResults_Pagination(t *testing.T) {
 	mockResultRepo.AssertExpectations(t)
 	mockDatasetRepo.AssertExpectations(t)
 	mockPredRepo.AssertExpectations(t)
+}
+
+// TestCancelEvaluation_PendingTask tests VAL-API-023 (cancel pending task returns 200)
+func TestCancelEvaluation_PendingTask(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusPending,
+		Progress: 0,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+	mockEvalRepo.On("Cancel", mock.Anything, evalID).Return(nil)
+	mockCache.On("SetStatus", mock.Anything, evalID, "cancelled").Return(nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 200 response (VAL-API-023)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify response has id and status=cancelled (VAL-API-023)
+	assert.Equal(t, evalID, response["id"])
+	assert.Equal(t, "cancelled", response["status"])
+
+	mockEvalRepo.AssertExpectations(t)
+	mockCache.AssertExpectations(t)
+}
+
+// TestCancelEvaluation_RunningTask tests VAL-API-023 (cancel running task returns 200)
+func TestCancelEvaluation_RunningTask(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusRunning,
+		Progress: 50,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+	mockEvalRepo.On("Cancel", mock.Anything, evalID).Return(nil)
+	mockCache.On("SetStatus", mock.Anything, evalID, "cancelled").Return(nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 200 response (VAL-API-023)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify response has id and status=cancelled (VAL-API-023)
+	assert.Equal(t, evalID, response["id"])
+	assert.Equal(t, "cancelled", response["status"])
+
+	mockEvalRepo.AssertExpectations(t)
+	mockCache.AssertExpectations(t)
+}
+
+// TestCancelEvaluation_CompletedTask tests VAL-API-024 (cancel completed task returns 409)
+func TestCancelEvaluation_CompletedTask(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusCompleted,
+		Progress: 100,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 409 Conflict for completed task (VAL-API-024)
+	assert.Equal(t, http.StatusConflict, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "completed")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestCancelEvaluation_AlreadyCancelled tests idempotent behavior (cancel already cancelled returns 200)
+func TestCancelEvaluation_AlreadyCancelled(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusCancelled,
+		Progress: 30,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
+	router := setupEvalTestRouter(handler)
+
+	// First cancellation
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 200 response for idempotent behavior
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify response has id and status=cancelled
+	assert.Equal(t, evalID, response["id"])
+	assert.Equal(t, "cancelled", response["status"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestCancelEvaluation_NotFound tests 404 case
+func TestCancelEvaluation_NotFound(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(nil, repository.ErrNotFound)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "not found")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestCancelEvaluation_InvalidUUID tests invalid UUID format returns 400
+func TestCancelEvaluation_InvalidUUID(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
+	router := setupEvalTestRouter(handler)
+
+	// Request with invalid UUID format
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/evaluations/invalid-uuid", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "invalid")
+	assert.Contains(t, response["error"].(string), "UUID")
+
+	mockEvalRepo.AssertExpectations(t)
 }

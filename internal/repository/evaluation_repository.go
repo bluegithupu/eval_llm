@@ -18,6 +18,7 @@ type EvaluationRepository interface {
 	GetByID(ctx context.Context, id string) (*model.Evaluation, error)
 	List(ctx context.Context, page, limit int) ([]*model.Evaluation, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.EvaluationStatus, progress int) error
+	Cancel(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
 	CountByStatus(ctx context.Context, status model.EvaluationStatus) (int, error)
@@ -240,6 +241,37 @@ func (r *PostgresEvaluationRepository) UpdateStatus(ctx context.Context, id stri
 
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("evaluation not found: %s", id)
+	}
+
+	return nil
+}
+
+// Cancel cancels an evaluation by setting status to cancelled and completed_at to now
+func (r *PostgresEvaluationRepository) Cancel(ctx context.Context, id string) error {
+	query := `
+		UPDATE evaluations
+		SET status = $1, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND status NOT IN ('completed', 'cancelled')
+	`
+
+	result, err := r.db.Exec(ctx, query, model.StatusCancelled, uuid.MustParse(id))
+	if err != nil {
+		return fmt.Errorf("failed to cancel evaluation: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		// Check if evaluation exists but is already completed/cancelled
+		var existingStatus model.EvaluationStatus
+		checkQuery := `SELECT status FROM evaluations WHERE id = $1`
+		err := r.db.QueryRow(ctx, checkQuery, uuid.MustParse(id)).Scan(&existingStatus)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return ErrNotFound
+			}
+			return fmt.Errorf("failed to check evaluation status: %w", err)
+		}
+		// Evaluation exists but was already in terminal state
+		return nil
 	}
 
 	return nil

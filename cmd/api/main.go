@@ -67,8 +67,7 @@ func main() {
 		v1.GET("/evaluations/:id", evalHandler.GetEvaluation)
 		v1.GET("/evaluations/:id/status", evalHandler.GetEvaluationStatus)
 		v1.GET("/evaluations/:id/results", evalHandler.GetResults)
-		// TODO: Add remaining evaluation endpoints
-		// DELETE /evaluations/:id - Cancel evaluation
+		v1.DELETE("/evaluations/:id", evalHandler.CancelEvaluation)
 
 		v1.GET("/models", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"models": []gin.H{
