@@ -41,8 +41,16 @@ func main() {
 	defer redisClient.Close()
 	log.Printf("Connected to Redis on %s:%d", cfg.Redis.Host, cfg.Redis.Port)
 
+	// Create repositories
+	evalRepo := repository.NewEvaluationRepository(db.Pool())
+	modelRepo := repository.NewModelRepository(db.Pool())
+	datasetRepo := repository.NewDatasetRepository(db.Pool())
+
 	// Create health handler
 	healthHandler := handler.NewHealthHandler(db, redisClient)
+
+	// Create evaluation handler
+	evalHandler := handler.NewEvaluationHandler(evalRepo, redisClient, modelRepo, datasetRepo)
 
 	// Health endpoints (liveness and readiness)
 	r.GET("/health", healthHandler.Health)
@@ -51,15 +59,14 @@ func main() {
 	// API v1 routes group
 	v1 := r.Group("/api/v1")
 	{
-		// TODO: Add evaluation endpoints
-		// POST /evaluations - Create evaluation task
+		// Evaluation endpoints
+		v1.POST("/evaluations", evalHandler.CreateEvaluation)
+		// TODO: Add remaining evaluation endpoints
 		// GET /evaluations - List evaluations (paginated)
 		// GET /evaluations/:id - Get evaluation details
 		// GET /evaluations/:id/status - Get evaluation status
 		// GET /evaluations/:id/results - Get evaluation results
 		// DELETE /evaluations/:id - Cancel evaluation
-		// GET /models - List supported models
-		// GET /datasets - List supported datasets
 
 		v1.GET("/models", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"models": []gin.H{

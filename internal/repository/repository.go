@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -11,3 +12,6 @@ import (
 // Ensure pgx types are referenced for go mod
 var _ pgx.Row
 var _ *pgxpool.Pool
+
+// ErrNotFound is returned when a resource is not found
+var ErrNotFound = errors.New("resource not found")

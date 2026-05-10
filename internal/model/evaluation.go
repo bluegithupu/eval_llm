@@ -34,19 +34,24 @@ type Evaluation struct {
 
 // Model represents a supported model
 type Model struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`     // "api" or "local"
-	Provider  string `json:"provider"` // "openai", "anthropic", "dashscope"
-	APIKeyRef string `json:"api_key_ref,omitempty"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`     // "api" or "local"
+	Provider  string    `json:"provider"` // "openai", "anthropic", "dashscope"
+	APIKeyRef string    `json:"api_key_ref,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Dataset represents a supported dataset
 type Dataset struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	ConfigTemplate string `json:"config_template"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	DisplayName    string    `json:"display_name"`
+	Description    string    `json:"description"`
+	ConfigTemplate string    `json:"config_template"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Result represents evaluation results
