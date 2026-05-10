@@ -407,8 +407,8 @@ func TestGetJobProgress(t *testing.T) {
 			name: "pending job (no active, no failed)",
 			job: &batchv1.Job{
 				Status: batchv1.JobStatus{
-					Active:  0,
-					Failed:  0,
+					Active:    0,
+					Failed:    0,
 					Succeeded: 0,
 				},
 			},
