@@ -157,6 +157,65 @@ func (m *MockDatasetRepository) List(ctx context.Context) ([]*model.Dataset, err
 	return args.Get(0).([]*model.Dataset), args.Error(1)
 }
 
+// MockResultRepository for testing
+type MockResultRepository struct {
+	mock.Mock
+}
+
+func (m *MockResultRepository) Create(ctx context.Context, result *repository.Result) error {
+	args := m.Called(ctx, result)
+	return args.Error(0)
+}
+
+func (m *MockResultRepository) GetByEvaluationID(ctx context.Context, evaluationID string) ([]*repository.Result, error) {
+	args := m.Called(ctx, evaluationID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*repository.Result), args.Error(1)
+}
+
+func (m *MockResultRepository) GetByEvaluationAndDataset(ctx context.Context, evaluationID, datasetID string) (*repository.Result, error) {
+	args := m.Called(ctx, evaluationID, datasetID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*repository.Result), args.Error(1)
+}
+
+func (m *MockResultRepository) QueryByMetrics(ctx context.Context, key, value string) ([]*repository.Result, error) {
+	args := m.Called(ctx, key, value)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*repository.Result), args.Error(1)
+}
+
+// MockPredictionRepository for testing
+type MockPredictionRepository struct {
+	mock.Mock
+}
+
+func (m *MockPredictionRepository) Create(ctx context.Context, prediction *repository.Prediction) error {
+	args := m.Called(ctx, prediction)
+	return args.Error(0)
+}
+
+func (m *MockPredictionRepository) BatchInsert(ctx context.Context, predictions []*repository.Prediction) error {
+	args := m.Called(ctx, predictions)
+	return args.Error(0)
+}
+
+func (m *MockPredictionRepository) GetByEvaluationID(ctx context.Context, evaluationID string, page, limit int) ([]*repository.Prediction, int, error) {
+	args := m.Called(ctx, evaluationID, page, limit)
+	return args.Get(0).([]*repository.Prediction), args.Int(1), args.Error(2)
+}
+
+func (m *MockPredictionRepository) CountByEvaluationID(ctx context.Context, evaluationID string) (int, error) {
+	args := m.Called(ctx, evaluationID)
+	return args.Int(0), args.Error(1)
+}
+
 func setupEvalTestRouter(handler *EvaluationHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -164,6 +223,7 @@ func setupEvalTestRouter(handler *EvaluationHandler) *gin.Engine {
 	router.GET("/api/v1/evaluations", handler.ListEvaluations)
 	router.GET("/api/v1/evaluations/:id", handler.GetEvaluation)
 	router.GET("/api/v1/evaluations/:id/status", handler.GetEvaluationStatus)
+	router.GET("/api/v1/evaluations/:id/results", handler.GetResults)
 	return router
 }
 
@@ -189,7 +249,7 @@ func TestCreateEvaluation_ValidRequest(t *testing.T) {
 	}).Return(nil)
 	mockCache.On("SetStatus", mock.Anything, mock.Anything, "pending").Return(nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router = setupEvalTestRouter(handler)
 
 	// Request body
@@ -237,7 +297,7 @@ func TestCreateEvaluation_MissingModel(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDatasetRepo := new(MockDatasetRepository)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request body without model
@@ -268,7 +328,7 @@ func TestCreateEvaluation_MissingDataset(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDatasetRepo := new(MockDatasetRepository)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request body without dataset
@@ -307,7 +367,7 @@ func TestCreateEvaluation_InvalidModel(t *testing.T) {
 		{ID: "3", Name: "qwen-max"},
 	}, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request body with invalid model
@@ -358,7 +418,7 @@ func TestCreateEvaluation_InvalidDataset(t *testing.T) {
 		{ID: "3", Name: "humaneval"},
 	}, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request body with invalid dataset
@@ -401,7 +461,7 @@ func TestListEvaluations_DefaultPagination(t *testing.T) {
 	// Mock expectations - empty list
 	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{}, 0, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request without pagination params (should use defaults)
@@ -449,7 +509,7 @@ func TestListEvaluations_CustomPagination(t *testing.T) {
 	mockModelRepo.On("GetByID", mock.Anything, modelID).Return(&model.Model{ID: modelID, Name: "gpt-4"}, nil)
 	mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request with custom pagination
@@ -491,7 +551,7 @@ func TestListEvaluations_TotalCount(t *testing.T) {
 		{ID: uuid.New().String(), Status: model.StatusPending},
 	}, 25, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
@@ -519,7 +579,7 @@ func TestListEvaluations_PagesCalculation(t *testing.T) {
 	// Test case: 25 total items, 10 per page = 3 pages (VAL-API-011)
 	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{}, 25, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
@@ -544,7 +604,7 @@ func TestListEvaluations_InvalidPage(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDatasetRepo := new(MockDatasetRepository)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request with invalid page (negative)
@@ -568,7 +628,7 @@ func TestListEvaluations_InvalidLimit(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDatasetRepo := new(MockDatasetRepository)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request with invalid limit (zero)
@@ -595,7 +655,7 @@ func TestListEvaluations_EmptyList(t *testing.T) {
 	// Mock expectations - empty list
 	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{}, 0, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
@@ -626,7 +686,7 @@ func TestListEvaluations_PageBeyondRange(t *testing.T) {
 	// Mock expectations - page beyond range, returns empty but total is 10 (2 pages total)
 	mockEvalRepo.On("List", mock.Anything, 100, 10).Return([]*model.Evaluation{}, 10, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request with page way beyond range
@@ -672,7 +732,7 @@ func TestGetEvaluation_ValidID(t *testing.T) {
 	mockModelRepo.On("GetByID", mock.Anything, modelID).Return(&model.Model{ID: modelID, Name: "gpt-4"}, nil)
 	mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID, nil)
@@ -709,7 +769,7 @@ func TestGetEvaluation_NotFound(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(nil, repository.ErrNotFound)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID, nil)
@@ -733,7 +793,7 @@ func TestGetEvaluation_InvalidUUID(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDatasetRepo := new(MockDatasetRepository)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request with invalid UUID format
@@ -787,7 +847,7 @@ func TestGetEvaluation_AllStatusTypes(t *testing.T) {
 			mockModelRepo.On("GetByID", mock.Anything, modelID).Return(&model.Model{ID: modelID, Name: "gpt-4"}, nil)
 			mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
 
-			handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+			handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 			router := setupEvalTestRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID, nil)
@@ -824,7 +884,7 @@ func TestGetEvaluationStatus_ValidID(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -861,7 +921,7 @@ func TestGetEvaluationStatus_PendingState(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -908,7 +968,7 @@ func TestGetEvaluationStatus_RunningState(t *testing.T) {
 
 			mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
 
-			handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+			handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 			router := setupEvalTestRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -946,7 +1006,7 @@ func TestGetEvaluationStatus_CompletedState(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -984,7 +1044,7 @@ func TestGetEvaluationStatus_FailedState(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -1023,7 +1083,7 @@ func TestGetEvaluationStatus_CancelledState(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -1054,7 +1114,7 @@ func TestGetEvaluationStatus_NotFound(t *testing.T) {
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(nil, repository.ErrNotFound)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/status", nil)
@@ -1078,7 +1138,7 @@ func TestGetEvaluationStatus_InvalidUUID(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDatasetRepo := new(MockDatasetRepository)
 
-	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, nil, nil)
 	router := setupEvalTestRouter(handler)
 
 	// Request with invalid UUID format
@@ -1095,4 +1155,309 @@ func TestGetEvaluationStatus_InvalidUUID(t *testing.T) {
 	assert.Contains(t, response["error"].(string), "UUID")
 
 	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetResults_CompletedTask tests VAL-API-020, VAL-API-022
+func TestGetResults_CompletedTask(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+	mockResultRepo := new(MockResultRepository)
+	mockPredRepo := new(MockPredictionRepository)
+
+	evalID := uuid.New().String()
+	modelID := uuid.New().String()
+	datasetID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:         evalID,
+		ModelID:    modelID,
+		DatasetIDs: []string{datasetID},
+		Status:     model.StatusCompleted,
+		Progress:   100,
+	}
+
+	results := []*repository.Result{
+		{
+			ID:           uuid.New().String(),
+			EvaluationID: evalID,
+			DatasetID:    datasetID,
+			Accuracy:     0.85,
+			SampleCount:  100,
+			CorrectCount: 85,
+			Metrics:      map[string]any{"f1": 0.87, "precision": 0.86},
+			Summary:      "Evaluation completed successfully",
+		},
+	}
+
+	predictions := []*repository.Prediction{
+		{
+			ID:            uuid.New().String(),
+			EvaluationID:  evalID,
+			DatasetID:     datasetID,
+			QuestionIndex: 0,
+			Question:      "What is 2+2?",
+			Prediction:    "4",
+			Answer:        "4",
+			Correct:       true,
+		},
+		{
+			ID:            uuid.New().String(),
+			EvaluationID:  evalID,
+			DatasetID:     datasetID,
+			QuestionIndex: 1,
+			Question:      "What is 3+3?",
+			Prediction:    "6",
+			Answer:        "6",
+			Correct:       true,
+		},
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+	mockResultRepo.On("GetByEvaluationID", mock.Anything, evalID).Return(results, nil)
+	mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
+	mockPredRepo.On("GetByEvaluationID", mock.Anything, evalID, 1, 100).Return(predictions, 2, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, mockResultRepo, mockPredRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/results", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify response has results (VAL-API-020, VAL-API-022)
+	assert.Contains(t, response, "results")
+	resultsList := response["results"].([]interface{})
+	assert.Len(t, resultsList, 1)
+
+	// Verify accuracy metric is included (VAL-API-022)
+	resultItem := resultsList[0].(map[string]interface{})
+	assert.Equal(t, 0.85, resultItem["accuracy"])
+	assert.Equal(t, 100, int(resultItem["sample_count"].(float64)))
+
+	// Verify predictions are included
+	assert.Contains(t, response, "predictions")
+	predictionsData := response["predictions"].(map[string]interface{})
+	assert.Equal(t, 2, int(predictionsData["total"].(float64)))
+
+	mockEvalRepo.AssertExpectations(t)
+	mockResultRepo.AssertExpectations(t)
+	mockDatasetRepo.AssertExpectations(t)
+	mockPredRepo.AssertExpectations(t)
+}
+
+// TestGetResults_PendingTask tests VAL-API-021 (409 for pending)
+func TestGetResults_PendingTask(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+	mockResultRepo := new(MockResultRepository)
+	mockPredRepo := new(MockPredictionRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusPending,
+		Progress: 0,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, mockResultRepo, mockPredRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/results", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 409 Conflict for pending task (VAL-API-021)
+	assert.Equal(t, http.StatusConflict, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "not available")
+	assert.Contains(t, response["error"].(string), "pending")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetResults_RunningTask tests VAL-API-021 (409 for running)
+func TestGetResults_RunningTask(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+	mockResultRepo := new(MockResultRepository)
+	mockPredRepo := new(MockPredictionRepository)
+
+	evalID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:       evalID,
+		Status:   model.StatusRunning,
+		Progress: 50,
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, mockResultRepo, mockPredRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/results", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 409 Conflict for running task (VAL-API-021)
+	assert.Equal(t, http.StatusConflict, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "not available")
+	assert.Contains(t, response["error"].(string), "running")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetResults_NotFound tests VAL-API-020 (404 case)
+func TestGetResults_NotFound(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+	mockResultRepo := new(MockResultRepository)
+	mockPredRepo := new(MockPredictionRepository)
+
+	evalID := uuid.New().String()
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(nil, repository.ErrNotFound)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, mockResultRepo, mockPredRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/results", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "not found")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetResults_InvalidUUID tests invalid UUID format
+func TestGetResults_InvalidUUID(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+	mockResultRepo := new(MockResultRepository)
+	mockPredRepo := new(MockPredictionRepository)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, mockResultRepo, mockPredRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/invalid-uuid/results", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "invalid")
+	assert.Contains(t, response["error"].(string), "UUID")
+}
+
+// TestGetResults_Pagination tests pagination for large prediction sets
+func TestGetResults_Pagination(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+	mockResultRepo := new(MockResultRepository)
+	mockPredRepo := new(MockPredictionRepository)
+
+	evalID := uuid.New().String()
+	modelID := uuid.New().String()
+	datasetID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:         evalID,
+		ModelID:    modelID,
+		DatasetIDs: []string{datasetID},
+		Status:     model.StatusCompleted,
+		Progress:   100,
+	}
+
+	results := []*repository.Result{
+		{
+			ID:           uuid.New().String(),
+			EvaluationID: evalID,
+			DatasetID:    datasetID,
+			Accuracy:     0.85,
+			SampleCount:  10000,
+			Metrics:      map[string]any{},
+		},
+	}
+
+	// Return 100 predictions for page 2
+	predictions := []*repository.Prediction{}
+	for i := 0; i < 100; i++ {
+		predictions = append(predictions, &repository.Prediction{
+			ID:            uuid.New().String(),
+			EvaluationID:  evalID,
+			DatasetID:     datasetID,
+			QuestionIndex: 100 + i,
+			Question:      "Question",
+			Prediction:    "Answer",
+			Answer:        "Answer",
+			Correct:       true,
+		})
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+	mockResultRepo.On("GetByEvaluationID", mock.Anything, evalID).Return(results, nil)
+	mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
+	mockPredRepo.On("GetByEvaluationID", mock.Anything, evalID, 2, 100).Return(predictions, 1000, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo, mockResultRepo, mockPredRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request page 2 with limit 100
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID+"/results?predictions_page=2&predictions_limit=100", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify pagination in predictions
+	assert.Contains(t, response, "predictions")
+	predictionsData := response["predictions"].(map[string]interface{})
+	assert.Equal(t, 2, int(predictionsData["page"].(float64)))
+	assert.Equal(t, 100, int(predictionsData["limit"].(float64)))
+	assert.Equal(t, 1000, int(predictionsData["total"].(float64)))
+	assert.Equal(t, 10, int(predictionsData["pages"].(float64))) // ceil(1000/100)
+
+	mockEvalRepo.AssertExpectations(t)
+	mockResultRepo.AssertExpectations(t)
+	mockDatasetRepo.AssertExpectations(t)
+	mockPredRepo.AssertExpectations(t)
 }

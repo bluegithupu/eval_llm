@@ -28,10 +28,12 @@ type CreateEvaluationResponse struct {
 
 // EvaluationHandler handles evaluation-related HTTP requests
 type EvaluationHandler struct {
-	evalRepo    repository.EvaluationRepository
-	cache       cache.StatusCache
-	modelRepo   repository.ModelRepository
-	datasetRepo repository.DatasetRepository
+	evalRepo        repository.EvaluationRepository
+	cache           cache.StatusCache
+	modelRepo       repository.ModelRepository
+	datasetRepo     repository.DatasetRepository
+	resultRepo      repository.ResultRepository
+	predictionRepo  repository.PredictionRepository
 }
 
 // ListEvaluationsResponse represents the response for listing evaluations
@@ -70,12 +72,16 @@ func NewEvaluationHandler(
 	cache cache.StatusCache,
 	modelRepo repository.ModelRepository,
 	datasetRepo repository.DatasetRepository,
+	resultRepo repository.ResultRepository,
+	predictionRepo repository.PredictionRepository,
 ) *EvaluationHandler {
 	return &EvaluationHandler{
-		evalRepo:    evalRepo,
-		cache:       cache,
-		modelRepo:   modelRepo,
-		datasetRepo: datasetRepo,
+		evalRepo:        evalRepo,
+		cache:           cache,
+		modelRepo:       modelRepo,
+		datasetRepo:     datasetRepo,
+		resultRepo:      resultRepo,
+		predictionRepo:  predictionRepo,
 	}
 }
 
@@ -436,6 +442,189 @@ func (h *EvaluationHandler) GetEvaluationStatus(c *gin.Context) {
 	// Add cancelled_at for cancelled status (VAL-API-019)
 	if eval.Status == model.StatusCancelled && eval.CompletedAt != nil {
 		response.CancelledAt = eval.CompletedAt.Format("2006-01-02T15:04:05Z07:00")
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// GetResultsResponse represents the response for getting evaluation results
+type GetResultsResponse struct {
+	Results     []*EvaluationResultItem `json:"results"`
+	Predictions *PredictionsPage        `json:"predictions,omitempty"`
+	Page        int                     `json:"page"`
+	Limit       int                     `json:"limit"`
+	Total       int                     `json:"total"`
+	Pages       int                     `json:"pages"`
+}
+
+// EvaluationResultItem represents a single result item in the results response
+type EvaluationResultItem struct {
+	DatasetID   string         `json:"dataset_id"`
+	DatasetName string         `json:"dataset_name"`
+	Accuracy    float64        `json:"accuracy"`
+	SampleCount int             `json:"sample_count"`
+	Metrics     map[string]any `json:"metrics,omitempty"`
+	Summary     string         `json:"summary,omitempty"`
+}
+
+// PredictionsPage represents paginated predictions
+type PredictionsPage struct {
+	Predictions []*PredictionItem `json:"predictions"`
+	Total       int               `json:"total"`
+	Page        int               `json:"page"`
+	Limit       int               `json:"limit"`
+	Pages       int               `json:"pages"`
+}
+
+// PredictionItem represents a single prediction item
+type PredictionItem struct {
+	ID         int    `json:"id"`
+	Question   string `json:"question"`
+	Prediction string `json:"prediction"`
+	Answer     string `json:"answer"`
+	Correct    bool   `json:"correct"`
+}
+
+// GetResults handles GET /api/v1/evaluations/:id/results
+// Returns evaluation results for completed tasks
+// Handles not ready (409/425 for pending/running), not found (404)
+// Supports pagination for large prediction sets
+func (h *EvaluationHandler) GetResults(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get ID from path parameter
+	id := c.Param("id")
+
+	// Validate UUID format
+	if _, err := uuid.Parse(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid evaluation ID format: must be a valid UUID",
+		})
+		return
+	}
+
+	// Get evaluation from repository
+	eval, err := h.evalRepo.GetByID(ctx, id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("evaluation not found: %s", id),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve evaluation",
+		})
+		return
+	}
+
+	// Check if evaluation is completed (VAL-API-021: 409/425 for pending/running)
+	if eval.Status != model.StatusCompleted {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "results not available: evaluation is " + string(eval.Status),
+		})
+		return
+	}
+
+	// Get results for this evaluation
+	results, err := h.resultRepo.GetByEvaluationID(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve results",
+		})
+		return
+	}
+
+	// Convert results to response items
+	resultItems := make([]*EvaluationResultItem, 0, len(results))
+	for _, result := range results {
+		// Get dataset name if available
+		datasetName := ""
+		if len(eval.DatasetIDs) > 0 {
+			if datasetEntity, err := h.datasetRepo.GetByID(ctx, result.DatasetID); err == nil {
+				datasetName = datasetEntity.Name
+			}
+		}
+
+		item := &EvaluationResultItem{
+			DatasetID:   result.DatasetID,
+			DatasetName: datasetName,
+			Accuracy:    result.Accuracy,
+			SampleCount: result.SampleCount,
+			Metrics:     result.Metrics,
+			Summary:     result.Summary,
+		}
+		resultItems = append(resultItems, item)
+	}
+
+	// Parse pagination parameters for predictions (default: page=1, limit=100)
+	page := 1
+	limit := 100
+
+	if pageStr := c.Query("predictions_page"); pageStr != "" {
+		var parsedPage int
+		if _, err := fmt.Sscanf(pageStr, "%d", &parsedPage); err != nil || parsedPage < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid predictions_page parameter: must be a positive integer",
+			})
+			return
+		}
+		page = parsedPage
+	}
+
+	if limitStr := c.Query("predictions_limit"); limitStr != "" {
+		var parsedLimit int
+		if _, err := fmt.Sscanf(limitStr, "%d", &parsedLimit); err != nil || parsedLimit < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid predictions_limit parameter: must be a positive integer",
+			})
+			return
+		}
+		limit = parsedLimit
+	}
+
+	// Get predictions for this evaluation with pagination
+	predictions, total, err := h.predictionRepo.GetByEvaluationID(ctx, id, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve predictions",
+		})
+		return
+	}
+
+	// Convert predictions to response items
+	predictionItems := make([]*PredictionItem, 0, len(predictions))
+	for _, pred := range predictions {
+		item := &PredictionItem{
+			ID:         pred.QuestionIndex,
+			Question:   pred.Question,
+			Prediction: pred.Prediction,
+			Answer:     pred.Answer,
+			Correct:    pred.Correct,
+		}
+		predictionItems = append(predictionItems, item)
+	}
+
+	// Calculate total pages for predictions
+	predPages := 0
+	if total > 0 && limit > 0 {
+		predPages = (total + limit - 1) / limit // ceil(total / limit)
+	}
+
+	// Build response
+	response := GetResultsResponse{
+		Results: resultItems,
+	}
+
+	// Include predictions only if there are any
+	if total > 0 {
+		response.Predictions = &PredictionsPage{
+			Predictions: predictionItems,
+			Total:       total,
+			Page:        page,
+			Limit:       limit,
+			Pages:       predPages,
+		}
 	}
 
 	c.JSON(http.StatusOK, response)
