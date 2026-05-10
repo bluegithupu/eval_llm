@@ -996,6 +996,8 @@ func TestGetEvaluationStatus_RunningState(t *testing.T) {
 }
 
 // TestGetEvaluationStatus_CompletedState tests VAL-API-017
+// This test verifies that progress is always 100 for completed status,
+// regardless of the stored progress value (handles bug where DB stores progress=0)
 func TestGetEvaluationStatus_CompletedState(t *testing.T) {
 	mockEvalRepo := new(MockEvaluationRepository)
 	mockCache := new(MockStatusCache)
@@ -1004,10 +1006,11 @@ func TestGetEvaluationStatus_CompletedState(t *testing.T) {
 
 	evalID := uuid.New().String()
 
+	// Simulate bug scenario: DB stores progress=0 even though status is completed
 	eval := &model.Evaluation{
 		ID:       evalID,
 		Status:   model.StatusCompleted,
-		Progress: 100,
+		Progress: 0, // Bug scenario: DB has progress=0
 	}
 
 	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
@@ -1025,6 +1028,7 @@ func TestGetEvaluationStatus_CompletedState(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &response)
 
 	// Verify completed state returns status=completed, progress=100 (VAL-API-017)
+	// Handler must override progress to 100 for completed status
 	assert.Equal(t, "completed", response["status"])
 	assert.Equal(t, float64(100), response["progress"])
 

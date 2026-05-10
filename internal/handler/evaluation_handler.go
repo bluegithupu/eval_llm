@@ -428,10 +428,16 @@ func (h *EvaluationHandler) GetEvaluationStatus(c *gin.Context) {
 	}
 
 	// Build response based on status (VAL-API-014, VAL-API-015, VAL-API-016, VAL-API-017, VAL-API-018, VAL-API-019)
+	// Compute progress: completed status always returns 100, otherwise use stored progress
+	progress := eval.Progress
+	if eval.Status == model.StatusCompleted {
+		progress = 100
+	}
+
 	response := GetEvaluationStatusResponse{
 		ID:       eval.ID,
 		Status:   eval.Status,
-		Progress: eval.Progress,
+		Progress: progress,
 	}
 
 	// Add error field for failed status (VAL-API-018)
