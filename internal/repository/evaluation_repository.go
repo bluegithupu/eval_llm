@@ -110,7 +110,7 @@ func (r *PostgresEvaluationRepository) GetByID(ctx context.Context, id string) (
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("evaluation not found: %s", id)
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get evaluation: %w", err)
 	}

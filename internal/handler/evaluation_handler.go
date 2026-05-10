@@ -53,6 +53,17 @@ type EvaluationListItem struct {
 	CreatedAt string                 `json:"created_at"`
 }
 
+// GetEvaluationResponse represents the response for getting a single evaluation
+type GetEvaluationResponse struct {
+	ID        string                 `json:"id"`
+	Model     string                 `json:"model"`
+	Dataset   string                 `json:"dataset"`
+	Status    model.EvaluationStatus `json:"status"`
+	Config    map[string]any         `json:"config"`
+	Progress  int                    `json:"progress"`
+	CreatedAt string                 `json:"created_at"`
+}
+
 // NewEvaluationHandler creates a new evaluation handler
 func NewEvaluationHandler(
 	evalRepo repository.EvaluationRepository,
@@ -300,6 +311,69 @@ func (h *EvaluationHandler) ListEvaluations(c *gin.Context) {
 		Limit: limit,
 		Total: total,
 		Pages: pages,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// GetEvaluation handles GET /api/v1/evaluations/:id
+// Returns task details including id, model, dataset, status, config, created_at
+// Handles not found (404) and invalid UUID format (400)
+func (h *EvaluationHandler) GetEvaluation(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get ID from path parameter
+	id := c.Param("id")
+
+	// Validate UUID format (VAL-API-013 - invalid UUID returns 400)
+	if _, err := uuid.Parse(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid evaluation ID format: must be a valid UUID",
+		})
+		return
+	}
+
+	// Get evaluation from repository (VAL-API-012)
+	eval, err := h.evalRepo.GetByID(ctx, id)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			// Task not found (VAL-API-013)
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("evaluation not found: %s", id),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve evaluation",
+		})
+		return
+	}
+
+	// Get model name
+	modelName := ""
+	if eval.ModelID != "" {
+		if modelEntity, err := h.modelRepo.GetByID(ctx, eval.ModelID); err == nil {
+			modelName = modelEntity.Name
+		}
+	}
+
+	// Get dataset name (first dataset ID)
+	datasetName := ""
+	if len(eval.DatasetIDs) > 0 && eval.DatasetIDs[0] != "" {
+		if datasetEntity, err := h.datasetRepo.GetByID(ctx, eval.DatasetIDs[0]); err == nil {
+			datasetName = datasetEntity.Name
+		}
+	}
+
+	// Build response (VAL-API-012)
+	response := GetEvaluationResponse{
+		ID:        eval.ID,
+		Model:     modelName,
+		Dataset:   datasetName,
+		Status:    eval.Status,
+		Config:    eval.Config,
+		Progress:  eval.Progress,
+		CreatedAt: eval.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
 	c.JSON(http.StatusOK, response)

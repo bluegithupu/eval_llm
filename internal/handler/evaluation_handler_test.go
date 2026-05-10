@@ -161,6 +161,7 @@ func setupEvalTestRouter(handler *EvaluationHandler) *gin.Engine {
 	router := gin.New()
 	router.POST("/api/v1/evaluations", handler.CreateEvaluation)
 	router.GET("/api/v1/evaluations", handler.ListEvaluations)
+	router.GET("/api/v1/evaluations/:id", handler.GetEvaluation)
 	return router
 }
 
@@ -643,4 +644,163 @@ func TestListEvaluations_PageBeyondRange(t *testing.T) {
 	assert.Equal(t, float64(1), response["pages"]) // ceil(10/10) = 1
 
 	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluation_ValidID tests VAL-API-012
+func TestGetEvaluation_ValidID(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+	modelID := uuid.New().String()
+	datasetID := uuid.New().String()
+
+	eval := &model.Evaluation{
+		ID:         evalID,
+		ModelID:    modelID,
+		DatasetIDs: []string{datasetID},
+		Status:     model.StatusPending,
+		Progress:   0,
+		Config:     map[string]any{"temperature": 0.7},
+	}
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+	mockModelRepo.On("GetByID", mock.Anything, modelID).Return(&model.Model{ID: modelID, Name: "gpt-4"}, nil)
+	mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify response fields (VAL-API-012)
+	assert.Equal(t, evalID, response["id"])
+	assert.Equal(t, "gpt-4", response["model"])
+	assert.Equal(t, "mmlu", response["dataset"])
+	assert.Equal(t, "pending", response["status"])
+	assert.NotNil(t, response["config"])
+	assert.Equal(t, float64(0), response["progress"])
+	assert.NotNil(t, response["created_at"])
+
+	mockEvalRepo.AssertExpectations(t)
+	mockModelRepo.AssertExpectations(t)
+	mockDatasetRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluation_NotFound tests VAL-API-013
+func TestGetEvaluation_NotFound(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	evalID := uuid.New().String()
+
+	mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(nil, repository.ErrNotFound)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "not found")
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestGetEvaluation_InvalidUUID tests VAL-API-013 (invalid UUID returns 400)
+func TestGetEvaluation_InvalidUUID(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request with invalid UUID format
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/invalid-uuid", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "invalid")
+	assert.Contains(t, response["error"].(string), "UUID")
+}
+
+// TestGetEvaluation_AllStatusTypes tests VAL-API-012 (different status values)
+func TestGetEvaluation_AllStatusTypes(t *testing.T) {
+	testCases := []struct {
+		name   string
+		status model.EvaluationStatus
+	}{
+		{"pending", model.StatusPending},
+		{"running", model.StatusRunning},
+		{"completed", model.StatusCompleted},
+		{"failed", model.StatusFailed},
+		{"cancelled", model.StatusCancelled},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockEvalRepo := new(MockEvaluationRepository)
+			mockCache := new(MockStatusCache)
+			mockModelRepo := new(MockModelRepository)
+			mockDatasetRepo := new(MockDatasetRepository)
+
+			evalID := uuid.New().String()
+			modelID := uuid.New().String()
+			datasetID := uuid.New().String()
+
+			eval := &model.Evaluation{
+				ID:         evalID,
+				ModelID:    modelID,
+				DatasetIDs: []string{datasetID},
+				Status:     tc.status,
+				Progress:   50,
+				Config:     map[string]any{},
+			}
+
+			mockEvalRepo.On("GetByID", mock.Anything, evalID).Return(eval, nil)
+			mockModelRepo.On("GetByID", mock.Anything, modelID).Return(&model.Model{ID: modelID, Name: "gpt-4"}, nil)
+			mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
+
+			handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+			router := setupEvalTestRouter(handler)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations/"+evalID, nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			var response map[string]interface{}
+			json.Unmarshal(w.Body.Bytes(), &response)
+			assert.Equal(t, string(tc.status), response["status"])
+
+			mockEvalRepo.AssertExpectations(t)
+			mockModelRepo.AssertExpectations(t)
+			mockDatasetRepo.AssertExpectations(t)
+		})
+	}
 }

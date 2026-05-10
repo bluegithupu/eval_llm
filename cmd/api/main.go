@@ -62,8 +62,8 @@ func main() {
 		// Evaluation endpoints
 		v1.POST("/evaluations", evalHandler.CreateEvaluation)
 		v1.GET("/evaluations", evalHandler.ListEvaluations)
+		v1.GET("/evaluations/:id", evalHandler.GetEvaluation)
 		// TODO: Add remaining evaluation endpoints
-		// GET /evaluations/:id - Get evaluation details
 		// GET /evaluations/:id/status - Get evaluation status
 		// GET /evaluations/:id/results - Get evaluation results
 		// DELETE /evaluations/:id - Cancel evaluation
