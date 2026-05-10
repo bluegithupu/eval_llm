@@ -85,6 +85,15 @@ func (m *mockEvalRepo) CountByStatus(ctx context.Context, status model.Evaluatio
 	return count, nil
 }
 
+func (m *mockEvalRepo) UpdateStatusWithError(ctx context.Context, id string, status model.EvaluationStatus, progress int, errorMsg string) error {
+	if eval, ok := m.evaluations[id]; ok {
+		eval.Status = status
+		eval.Progress = progress
+		eval.ErrorMessage = errorMsg
+	}
+	return nil
+}
+
 // newMockLogger creates a logger for testing
 func newMockLogger() *slog.Logger {
 	return slog.Default()

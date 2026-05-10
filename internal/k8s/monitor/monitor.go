@@ -252,6 +252,11 @@ func (m *Monitor) handleStateChange(ctx context.Context, evalID string, k8sJob *
 			message = "Job failed"
 		}
 
+		// Store error with Job failure reason for debugging
+		if m.eventStore != nil {
+			_ = m.eventStore.StoreError(ctx, evalID, ErrorTypeK8sJobFailed, message, "")
+		}
+
 	default:
 		// Pending or unknown state - no event needed
 		return

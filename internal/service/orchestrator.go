@@ -54,6 +54,9 @@ type Orchestrator struct {
 
 	// Channel for completed evaluations
 	doneChan chan<- string
+
+	// Event store for error logging
+	eventStore monitor.EventStore
 }
 
 // NewOrchestrator creates a new evaluation orchestrator
@@ -65,6 +68,7 @@ func NewOrchestrator(
 	predRepo repository.PredictionRepository,
 	monitor *monitor.Monitor,
 	logger *slog.Logger,
+	eventStore monitor.EventStore,
 ) *Orchestrator {
 	if cfg == nil {
 		cfg = DefaultOrchestratorConfig()
@@ -88,6 +92,7 @@ func NewOrchestrator(
 		logger:        logger,
 		configGen:     configGen,
 		secretManager: secretMgr,
+		eventStore:    eventStore,
 	}
 }
 
@@ -310,11 +315,39 @@ func (o *Orchestrator) CancelEvaluation(ctx context.Context, evalID string) erro
 }
 
 // markFailed marks an evaluation as failed with an error message
+// It stores the error in the DB and logs it to the event store
 func (o *Orchestrator) markFailed(ctx context.Context, evalID string, errorMsg string) {
-	if err := o.evalRepo.UpdateStatus(ctx, evalID, model.StatusFailed, 0); err != nil {
+	// Update status with error message in DB
+	if err := o.evalRepo.UpdateStatusWithError(ctx, evalID, model.StatusFailed, 0, errorMsg); err != nil {
 		o.logger.Error("failed to update status to failed", "eval_id", evalID, "error", err)
 	}
+
+	// Log error to event store (for stderr capture)
+	if o.eventStore != nil {
+		if storeErr := o.eventStore.StoreError(ctx, evalID, monitor.ErrorTypeOpenCompass, errorMsg, ""); storeErr != nil {
+			o.logger.Error("failed to store error event", "eval_id", evalID, "error", storeErr)
+		}
+	}
+
 	o.logger.Error("evaluation failed", "eval_id", evalID, "error", errorMsg)
+}
+
+// markFailedWithStderr marks an evaluation as failed with an error message and stderr output
+// This is used to capture OpenCompass stderr and store it in the logs table
+func (o *Orchestrator) markFailedWithStderr(ctx context.Context, evalID string, errorMsg string, stderr string) {
+	// Update status with error message in DB
+	if err := o.evalRepo.UpdateStatusWithError(ctx, evalID, model.StatusFailed, 0, errorMsg); err != nil {
+		o.logger.Error("failed to update status to failed", "eval_id", evalID, "error", err)
+	}
+
+	// Log error to event store with stderr for debugging
+	if o.eventStore != nil {
+		if storeErr := o.eventStore.StoreError(ctx, evalID, monitor.ErrorTypeOpenCompass, errorMsg, stderr); storeErr != nil {
+			o.logger.Error("failed to store error event", "eval_id", evalID, "error", storeErr)
+		}
+	}
+
+	o.logger.Error("evaluation failed", "eval_id", evalID, "error", errorMsg, "stderr", stderr)
 }
 
 // generateConfigDataForJob generates ConfigData for creating a ConfigMap via the generator

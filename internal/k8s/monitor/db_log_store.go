@@ -42,6 +42,45 @@ func NewDBLogStore(db *pgxpool.Pool) *DBLogStore {
 	return &DBLogStore{db: db}
 }
 
+// StoreError stores an error event with detailed error information including stderr
+func (s *DBLogStore) StoreError(ctx context.Context, evalID string, errorType ErrorType, message string, stderr string) error {
+	if evalID == "" {
+		return fmt.Errorf("evalID is required")
+	}
+
+	// Build metadata with error details
+	metadata := map[string]any{
+		"error_type": string(errorType),
+		"stderr":     stderr,
+	}
+
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	query := `
+		INSERT INTO logs (id, evaluation_id, timestamp, level, message, source, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+
+	_, err = s.db.Exec(ctx, query,
+		uuid.New().String(),
+		uuid.MustParse(evalID),
+		time.Now(),
+		LogLevelError,
+		fmt.Sprintf("%s: %s", message, stderr),
+		fmt.Sprintf("error-%s", string(errorType)),
+		metadataJSON,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert error log: %w", err)
+	}
+
+	return nil
+}
+
 // StoreEvent stores a job event in the database logs table
 func (s *DBLogStore) StoreEvent(ctx context.Context, event *JobEvent) error {
 	if event == nil {

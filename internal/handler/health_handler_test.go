@@ -68,6 +68,11 @@ func (m *MockCache) Close() error {
 	return args.Error(0)
 }
 
+func (m *MockCache) IsAvailable(ctx context.Context) bool {
+	args := m.Called(ctx)
+	return args.Bool(0)
+}
+
 func setupTestRouter(handler *HealthHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

@@ -126,6 +126,10 @@ func (c *mockCache) Close() error {
 	return nil
 }
 
+func (c *mockCache) IsAvailable(ctx context.Context) bool {
+	return true
+}
+
 func TestJobName(t *testing.T) {
 	evalID := "test-eval-123"
 	name := job.JobName(evalID)

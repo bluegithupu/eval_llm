@@ -45,6 +45,11 @@ func (m *MockEvaluationRepository) UpdateStatus(ctx context.Context, id string, 
 	return args.Error(0)
 }
 
+func (m *MockEvaluationRepository) UpdateStatusWithError(ctx context.Context, id string, status model.EvaluationStatus, progress int, errorMsg string) error {
+	args := m.Called(ctx, id, status, progress, errorMsg)
+	return args.Error(0)
+}
+
 func (m *MockEvaluationRepository) Cancel(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
@@ -108,6 +113,11 @@ func (m *MockStatusCache) Ping(ctx context.Context) error {
 func (m *MockStatusCache) Close() error {
 	args := m.Called()
 	return args.Error(0)
+}
+
+func (m *MockStatusCache) IsAvailable(ctx context.Context) bool {
+	args := m.Called(ctx)
+	return args.Bool(0)
 }
 
 // MockModelRepository for testing

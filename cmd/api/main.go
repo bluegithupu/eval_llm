@@ -91,6 +91,7 @@ func main() {
 			predictionRepo,
 			jobMonitor,
 			logger,
+			eventStore,
 		)
 
 		// Start result collector in background

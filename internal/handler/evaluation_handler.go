@@ -218,9 +218,10 @@ func (h *EvaluationHandler) CreateEvaluation(c *gin.Context) {
 		return
 	}
 
-	// Set Redis status to pending
+	// Set Redis status to pending (graceful failure if Redis unavailable)
 	if err := h.cache.SetStatus(ctx, taskID, "pending"); err != nil {
 		// Log the error but don't fail - DB is authoritative
+		// Redis failure is acceptable as DB is source of truth
 	}
 
 	// Start the evaluation job using the orchestrator (if available)
@@ -229,7 +230,7 @@ func (h *EvaluationHandler) CreateEvaluation(c *gin.Context) {
 			startCtx := context.Background()
 			if err := h.orchestrator.StartEvaluation(startCtx, evaluation, modelEntity, datasetEntity); err != nil {
 				// Log error - the evaluation will remain in pending state
-				// In production, this would be logged properly
+				// Error will be propagated via status endpoint when checked
 				_ = err
 			}
 		}()

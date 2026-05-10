@@ -11,6 +11,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// ErrRedisUnavailable indicates Redis is not available
+var ErrRedisUnavailable = errors.New("redis unavailable")
+
 // StatusCache interface for status caching
 type StatusCache interface {
 	SetStatus(ctx context.Context, evalID string, status string) error
@@ -21,6 +24,8 @@ type StatusCache interface {
 	DeleteProgress(ctx context.Context, evalID string) error
 	Ping(ctx context.Context) error
 	Close() error
+	// IsAvailable returns true if Redis is currently reachable
+	IsAvailable(ctx context.Context) bool
 }
 
 // RedisClient implements StatusCache with Redis backend
@@ -136,4 +141,11 @@ func (r *RedisClient) Client() *redis.Client {
 // IsKeyNotFound checks if the error is a Redis Nil error (key not found)
 func (r *RedisClient) IsKeyNotFound(err error) bool {
 	return errors.Is(err, redis.Nil)
+}
+
+// IsAvailable returns true if Redis is currently reachable
+// This is used to implement fallback to K8s polling when Redis is unavailable
+func (r *RedisClient) IsAvailable(ctx context.Context) bool {
+	err := r.client.Ping(ctx).Err()
+	return err == nil
 }

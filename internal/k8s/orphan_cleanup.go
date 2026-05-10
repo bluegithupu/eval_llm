@@ -53,9 +53,9 @@ type OrphanCleaner struct {
 
 // CleanupEvent represents a cleanup event for an orphaned Job
 type CleanupEvent struct {
-	EvalID   string
-	Event    string // "job_deleted", "job_not_found", "skipped", "error"
-	Message  string
+	EvalID    string
+	Event     string // "job_deleted", "job_not_found", "skipped", "error"
+	Message   string
 	Timestamp time.Time
 }
 
@@ -71,12 +71,12 @@ func NewOrphanCleaner(
 	}
 
 	return &OrphanCleaner{
-		client:     client,
-		namespace:  cfg.Namespace,
-		evalRepo:   evalRepo,
-		cfg:        cfg,
-		logger:     logger,
-		stopChan:   make(chan struct{}),
+		client:      client,
+		namespace:   cfg.Namespace,
+		evalRepo:    evalRepo,
+		cfg:         cfg,
+		logger:      logger,
+		stopChan:    make(chan struct{}),
 		cleanupChan: make(chan *CleanupEvent, 100),
 	}
 }

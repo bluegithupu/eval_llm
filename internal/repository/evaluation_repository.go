@@ -18,6 +18,7 @@ type EvaluationRepository interface {
 	GetByID(ctx context.Context, id string) (*model.Evaluation, error)
 	List(ctx context.Context, page, limit int) ([]*model.Evaluation, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.EvaluationStatus, progress int) error
+	UpdateStatusWithError(ctx context.Context, id string, status model.EvaluationStatus, progress int, errorMsg string) error
 	Cancel(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
@@ -228,13 +229,20 @@ func (r *PostgresEvaluationRepository) List(ctx context.Context, page, limit int
 // UpdateStatus updates the status and progress of an evaluation
 // The database trigger will automatically set started_at and completed_at
 func (r *PostgresEvaluationRepository) UpdateStatus(ctx context.Context, id string, status model.EvaluationStatus, progress int) error {
+	return r.UpdateStatusWithError(ctx, id, status, progress, "")
+}
+
+// UpdateStatusWithError updates the status, progress, and error message of an evaluation
+// If errorMsg is provided, it will be stored in the error_message column
+// The database trigger will automatically set started_at and completed_at
+func (r *PostgresEvaluationRepository) UpdateStatusWithError(ctx context.Context, id string, status model.EvaluationStatus, progress int, errorMsg string) error {
 	query := `
 		UPDATE evaluations
-		SET status = $1, progress = $2, updated_at = CURRENT_TIMESTAMP
+		SET status = $1, progress = $2, error_message = CASE WHEN $4 = '' THEN NULL ELSE $4 END, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $3
 	`
 
-	result, err := r.db.Exec(ctx, query, status, progress, uuid.MustParse(id))
+	result, err := r.db.Exec(ctx, query, status, progress, uuid.MustParse(id), errorMsg)
 	if err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
 	}
