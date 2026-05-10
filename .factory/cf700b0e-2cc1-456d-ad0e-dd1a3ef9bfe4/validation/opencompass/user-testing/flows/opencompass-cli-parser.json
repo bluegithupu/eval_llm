@@ -1,0 +1,93 @@
+{
+  "groupId": "opencompass-cli-parser",
+  "milestone": "opencompass",
+  "surface": "unit-tests",
+  "tool": "subprocess",
+  "assertions": [
+    "VAL-OC-001",
+    "VAL-OC-002",
+    "VAL-OC-003",
+    "VAL-OC-004",
+    "VAL-OC-005",
+    "VAL-OC-006",
+    "VAL-OC-007",
+    "VAL-OC-008",
+    "VAL-OC-009",
+    "VAL-OC-010",
+    "VAL-OC-011",
+    "VAL-OC-012",
+    "VAL-OC-013"
+  ],
+  "isolationContext": "Unit tests for internal/evaluator (CLI wrapper, parser) and internal/k8s/configmap (config generator) packages",
+  "results": [
+    {
+      "assertionId": "VAL-OC-001",
+      "status": "pass",
+      "evidence": "TestCLIWrapper_BuildCommand and related tests verify CLI command construction with --datasets, --work-dir, --config flags. TestCLIWrapper_BuildCommand_HasConfigFlag confirms config flag present."
+    },
+    {
+      "assertionId": "VAL-OC-002",
+      "status": "pass",
+      "evidence": "TestCLIWrapper_EnvironmentVariables and TestCLIWrapper_SetEnvVars pass. API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, DASHSCOPE_API_KEY) injected via EnvVars in BuildCommand."
+    },
+    {
+      "assertionId": "VAL-OC-003",
+      "status": "pass",
+      "evidence": "TestCLIWrapper_Execute_Timeout passes (0.20s). CLIConfig.Timeout enforced in Execute method with context deadline."
+    },
+    {
+      "assertionId": "VAL-OC-004",
+      "status": "pass",
+      "evidence": "TestValidateConfigSyntax_* tests pass: ValidConfig, UnbalancedParentheses, UnbalancedBrackets, UnbalancedBraces, MissingConfigPyReference all pass. Validates Python syntax via balanced parentheses/brackets/braces check."
+    },
+    {
+      "assertionId": "VAL-OC-005",
+      "status": "pass",
+      "evidence": "TestGenerateConfig_ContainsRequiredModelFields passes. Generated config includes: type, path, max_seq_len, max_out_len, batch_size, run_cfg."
+    },
+    {
+      "assertionId": "VAL-OC-006",
+      "status": "pass",
+      "evidence": "TestGenerateConfig_OpenAIIncludesNumGPUs passes. OpenAI config has type='OpenAI', path='gpt-4', key='env://OPENAI_API_KEY', num_gpus=0."
+    },
+    {
+      "assertionId": "VAL-OC-007",
+      "status": "pass",
+      "evidence": "TestGenerateConfig_AnthropicModel passes. Claude config has type='Anthropic', key='env://ANTHROPIC_API_KEY', num_gpus=0."
+    },
+    {
+      "assertionId": "VAL-OC-008",
+      "status": "pass",
+      "evidence": "TestGenerateConfig_DashscopeModel passes. Qwen config has type='DashScope', key='env://DASHSCOPE_API_KEY', num_gpus=0, dashscope_api_base."
+    },
+    {
+      "assertionId": "VAL-OC-009",
+      "status": "pass",
+      "evidence": "TestParser_ParsePredictions passes. parsePredictionFile extracts question, prediction, answer fields from JSON. Handles both array and single object formats."
+    },
+    {
+      "assertionId": "VAL-OC-010",
+      "status": "pass",
+      "evidence": "TestParser_ParseSummaryCSV passes. parseSummaryCSV extracts dataset, model, metric, value from CSV. Handles 'value' and 'accuracy' column headers."
+    },
+    {
+      "assertionId": "VAL-OC-011",
+      "status": "pass",
+      "evidence": "TestGenerateTimestamp and TestValidateTimestamp pass. GenerateTimestamp produces format YYYYMMDD_HHMMSS. ValidateTimestamp regex ^\\d{8}_\\d{6}$ correctly validates."
+    },
+    {
+      "assertionId": "VAL-OC-012",
+      "status": "pass",
+      "evidence": "TestParser_CleanupOutputDir passes. CleanupOutputDir uses os.RemoveAll to recursively delete output directory. TestParser_CleanupOutputDir_NonExistent handles missing dir."
+    },
+    {
+      "assertionId": "VAL-OC-013",
+      "status": "pass",
+      "evidence": "TestCLIWrapper_Execute_NonZeroExitCode passes. CLIResult captures ExitCode from ExecError. TestCLIWrapper_Execute_ExitCode2 and ExitCode127 verify non-zero codes captured."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["go test", "subprocess"],
+  "coverage": "91.7% of statements in internal/evaluator package. All 13 OpenCompass CLI integration assertions verified via unit tests."
+}

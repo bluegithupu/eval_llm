@@ -1,0 +1,69 @@
+{
+  "featureId": "error-propagation",
+  "reviewedAt": "2026-05-10T20:45:00Z",
+  "commitId": "99753d4",
+  "repoPath": "/private/tmp/eval_llm",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Feature partially implemented. Error storage infrastructure exists (UpdateStatusWithError, StoreError interface, IsAvailable for Redis) and API correctly returns error field. However, the core requirement of 'capturing OpenCompass stderr' is not fully realized because: (1) markFailedWithStderr is never called anywhere in the codebase, (2) InMemoryEventStore.StoreError discards stderr parameter with _ = stderr. The K8s Job error handling works, and DB/Redis failures are handled gracefully, but the primary stderr capture flow is incomplete.",
+    "issues": [
+      {
+        "file": "internal/service/orchestrator.go",
+        "line": 331,
+        "severity": "blocking",
+        "description": "markFailedWithStderr method is defined but never called. The feature description requires 'Capture OpenCompass stderr' but there's no code path that actually invokes this method with CLI execution results. No caller passes CLI result stderr to this method."
+      },
+      {
+        "file": "internal/k8s/monitor/event_store.go",
+        "line": 104,
+        "severity": "blocking",
+        "description": "InMemoryEventStore.StoreError discards stderr parameter: `_ = stderr // Stored in memory for debugging purposes'. The comment claims stderr is stored but it's actually discarded. This means error events in the in-memory store lose stderr information."
+      },
+      {
+        "file": "internal/k8s/monitor/event_store.go",
+        "line": 90,
+        "severity": "non_blocking",
+        "description": "JobEvent struct has no stderr field. Even if stderr was captured, there's nowhere to store it in the event model. Need to either add a Stderr field to JobEvent or store it in Metadata."
+      },
+      {
+        "file": "internal/service/orchestrator_test.go",
+        "line": 396,
+        "severity": "non_blocking",
+        "description": "TestMarkFailedWithError and TestMarkFailedWithStderr are incomplete - they only mock expectations but don't actually invoke the methods under test. Tests don't verify actual behavior, only mock setup."
+      },
+      {
+        "file": "internal/evaluator/cli.go",
+        "line": 110,
+        "severity": "suggestion",
+        "description": "CLIResult has Stderr field but there's no integration code that passes this to orchestrator.markFailedWithStderr. The CLI wrapper captures stderr correctly but it never flows to error storage."
+      },
+      {
+        "file": "internal/handler/evaluation_handler.go",
+        "line": 556,
+        "severity": "non_blocking",
+        "description": "GetEvaluationStatus correctly returns error field for failed evaluations (VAL-API-018). This part of the feature works correctly."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Worker did not follow TDD procedure from backend-worker skill. Tests for error propagation were written after implementation, not before. The SKILL.md explicitly requires Step 3: 'Write Tests First (TDD - Red Phase)' and Step 5 verification. The transcript shows tests were added after build/test cycle rather than as a prerequisite.",
+      "evidence": "Transcript shows: go build → go test → then test additions. Skill requires: write tests first, verify red, then implement."
+    },
+    {
+      "area": "skills",
+      "observation": "The backend-worker skill procedure mentions OpenCompass CLI integration testing but doesn't specify how to handle stderr capture in the orchestrator. Worker had to figure out where to inject stderr capture logic.",
+      "evidence": "SKILL.md Step 6 mentions 'OpenCompass CLI integration testing' but doesn't have guidance on connecting CLI stderr to error propagation. Worker implemented markFailedWithStderr but never connected it to CLI execution."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Worker spent time understanding the Monitor and EventStore interfaces for error logging. The library/architecture.md mentions logs table but doesn't describe error logging flow or stderr capture patterns. Worker figured out by reading implementation.",
+      "evidence": "Transcript shows multiple Read calls on monitor.go, event_store.go, db_log_store.go to understand error storage patterns."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The error-propagation feature infrastructure is in place (UpdateStatusWithError, StoreError interface, IsAvailable for Redis fallback) and the API correctly returns errors via the status endpoint. However, the primary requirement of capturing OpenCompass stderr is incomplete: markFailedWithStderr is never invoked and InMemoryEventStore.StoreError discards the stderr parameter. K8s Job error handling works correctly. The implementation handles DB and Redis failures gracefully as required. Tests are incomplete and don't verify actual behavior."
+}

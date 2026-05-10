@@ -1,0 +1,42 @@
+{
+  "groupId": "models-datasets",
+  "testedAt": "2026-05-10T00:00:00Z",
+  "isolation": {
+    "apiUrl": "http://localhost:3100",
+    "testingTool": "curl"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-025",
+      "title": "List Models Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/models", "expected": "HTTP 200 with models array containing gpt-4, claude, qwen", "observed": "HTTP 200, models array contains gpt-4, claude, qwen" }
+      ],
+      "evidence": {
+        "screenshots": null,
+        "consoleErrors": "N/A (API test)",
+        "network": "GET /api/v1/models -> 200"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-026",
+      "title": "List Datasets Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/datasets", "expected": "HTTP 200 with datasets array containing MMLU, HellaSwag", "observed": "HTTP 200, datasets array contains MMLU, HellaSwag (case-insensitive match)" }
+      ],
+      "evidence": {
+        "screenshots": null,
+        "consoleErrors": "N/A (API test)",
+        "network": "GET /api/v1/datasets -> 200"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 2 assertions: 2 passed. Both VAL-API-025 (List Models) and VAL-API-026 (List Datasets) returned HTTP 200 with expected arrays. Note: dataset IDs are lowercase (mmlu, hellaswag) matching the specification's lowercase references."
+}

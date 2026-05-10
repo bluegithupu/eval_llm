@@ -1,0 +1,38 @@
+VAL-DB-001: Evaluations Table Schema
+====================================
+SQL: \d evaluations
+
+Output:
+                                   Table "public.evaluations"
+    Column     |           Type           | Collation | Nullable |           Default            
+---------------+--------------------------+-----------+----------+------------------------------
+ id            | uuid                     |           | not null | uuid_generate_v4()
+ model_id      | uuid                     |           | not null | 
+ dataset_ids   | uuid[]                   |           | not null | 
+ config        | jsonb                    |           |          | '{}'::jsonb
+ status        | character varying(50)    |           | not null | 'pending'::character varying
+ progress      | integer                  |           |          | 0
+ error_message | text                     |           |          | 
+ created_at    | timestamp with time zone |           | not null | CURRENT_TIMESTAMP
+ updated_at    | timestamp with time zone |           | not null | CURRENT_TIMESTAMP
+ started_at    | timestamp with time zone |           |          | 
+ completed_at  | timestamp with time zone |           |          | 
+Indexes:
+    "evaluations_pkey" PRIMARY KEY, btree (id)
+    "idx_evaluations_created_at" btree (created_at DESC)
+    "idx_evaluations_model_id" btree (model_id)
+    "idx_evaluations_status" btree (status)
+Check constraints:
+    "evaluations_progress_check" CHECK (progress >= 0 AND progress <= 100)
+    "evaluations_status_check" CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[]))
+Foreign-key constraints:
+    "evaluations_model_id_fkey" FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE RESTRICT
+Referenced by:
+    TABLE "logs" CONSTRAINT "logs_evaluation_id_fkey" FOREIGN KEY (evaluation_id) REFERENCES evaluations(id) ON DELETE CASCADE
+    TABLE "predictions" CONSTRAINT "predictions_evaluation_id_fkey" FOREIGN KEY (evaluation_id) REFERENCES evaluations(id) ON DELETE CASCADE
+    TABLE "results" CONSTRAINT "results_evaluation_id_fkey" FOREIGN KEY (evaluation_id) REFERENCES evaluations(id) ON DELETE CASCADE
+Triggers:
+    update_evaluation_status_timestamps BEFORE UPDATE ON evaluations FOR EACH ROW EXECUTE FUNCTION update_evaluation_timestamps()
+    update_evaluations_updated_at BEFORE UPDATE ON evaluations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+
+RESULT: PASS - All required columns present with correct types and nullable flags.

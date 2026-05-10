@@ -1,0 +1,27 @@
+=== High Concurrency Load Test (VAL-CROSS-010) ===
+Start time: 2026-05-10T21:51:19+08:00
+
+All requests completed.
+End time: 2026-05-10T21:51:19+08:00
+Elapsed time: .143346000s
+
+=== Results Summary ===
+Total requests: 20
+Successful (202): 0
+Failed: 20
+Failure codes:                    
+STATUS: FAIL - Only 0/20 returned 202
+
+=== Checking K8s Jobs ===
+No resources found in llm-eval namespace.
+
+Job count:        0
+
+=== Checking evaluations in DB ===
+ count 
+-------
+    71
+(1 行记录)
+
+
+=== Test Complete ===

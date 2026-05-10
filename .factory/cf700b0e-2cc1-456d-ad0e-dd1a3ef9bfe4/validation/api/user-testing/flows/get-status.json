@@ -1,0 +1,114 @@
+{
+  "groupId": "get-status",
+  "testedAt": "2026-05-10T10:00:00Z",
+  "isolation": {
+    "apiUrl": "http://localhost:3100",
+    "testingTool": "curl"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-012",
+      "title": "Get Task Details Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id", "expected": "200 with task details", "observed": "200 with id, model, dataset, status, created_at, config, progress" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/765ad646-6afa-40aa-aa86-ffa15a18f520 -> 200",
+        "responseFile": "VAL-API-012-get-details.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-013",
+      "title": "Task Not Found",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/00000000-0000-0000-0000-000000000000", "expected": "404 with error", "observed": "404 with {\"error\":\"evaluation not found: 00000000-0000-0000-0000-000000000000\"}" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/00000000-0000-0000-0000-000000000000 -> 404",
+        "responseFile": "VAL-API-013-not-found.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-014",
+      "title": "Get Status Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id/status", "expected": "200 with status, progress", "observed": "200 with id, status, progress fields" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/765ad646-6afa-40aa-aa86-ffa15a18f520/status -> 200",
+        "responseFile": "VAL-API-014-get-status.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-015",
+      "title": "Status Pending State",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id/status for pending task", "expected": "status: pending, progress: 0", "observed": "status: pending, progress: 0" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/765ad646-6afa-40aa-aa86-ffa15a18f520/status -> 200"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-016",
+      "title": "Status Running State",
+      "status": "blocked",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id/status for running task", "expected": "status: running, progress: 1-99", "observed": "Unable to test - no running tasks exist in the system" }
+      ],
+      "evidence": {},
+      "issues": "No running tasks exist in the system. All 29 tasks are either pending or cancelled. Cannot verify running state without actual running evaluation."
+    },
+    {
+      "id": "VAL-API-017",
+      "title": "Status Completed State",
+      "status": "blocked",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id/status for completed task", "expected": "status: completed, progress: 100", "observed": "Unable to test - no completed tasks exist in the system" }
+      ],
+      "evidence": {},
+      "issues": "No completed tasks exist in the system. All 29 tasks are either pending or cancelled. Cannot verify completed state without actual completed evaluation."
+    },
+    {
+      "id": "VAL-API-018",
+      "title": "Status Failed State",
+      "status": "blocked",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id/status for failed task", "expected": "status: failed, error field", "observed": "Unable to test - no failed tasks exist in the system" }
+      ],
+      "evidence": {},
+      "issues": "No failed tasks exist in the system. All 29 tasks are either pending or cancelled. Cannot verify failed state without actual failed evaluation."
+    },
+    {
+      "id": "VAL-API-019",
+      "title": "Status Cancelled State",
+      "status": "pass",
+      "steps": [
+        { "action": "curl GET /api/v1/evaluations/:id/status for cancelled task", "expected": "status: cancelled, cancelled_at timestamp", "observed": "status: cancelled, cancelled_at: 2026-05-10T16:45:29+08:00, progress: 0" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/09e5dafd-8279-4286-afb8-4a009f011648/status -> 200",
+        "responseFile": "VAL-API-019-cancelled-status.txt"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "description": "No running, completed, or failed tasks exist in the system. All 29 evaluations are either pending or cancelled.",
+      "affectedAssertions": ["VAL-API-016", "VAL-API-017", "VAL-API-018"],
+      "quickFixAttempted": "N/A - this is expected state for the test environment. The evaluation processing service may not be running or K8s integration is not active."
+    }
+  ],
+  "summary": "Tested 8 assertions: 5 passed (VAL-API-012, VAL-API-013, VAL-API-014, VAL-API-015, VAL-API-019), 3 blocked (VAL-API-016, VAL-API-017, VAL-API-018 - require running/completed/failed evaluations which don't exist). Endpoints work correctly when the requested task state exists."
+}

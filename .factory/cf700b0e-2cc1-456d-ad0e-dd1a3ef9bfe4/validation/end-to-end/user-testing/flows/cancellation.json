@@ -1,0 +1,67 @@
+{
+  "groupId": "cancellation",
+  "testedAt": "2026-05-10T13:52:07Z",
+  "isolation": {
+    "api": "http://localhost:3100",
+    "postgres": "localhost:3105 (container: eval-postgres, user: eval_user, db: evaluations)",
+    "redis": "localhost:3106",
+    "kubernetes": "namespace llm-eval"
+  },
+  "toolsUsed": ["curl", "kubectl", "psql"],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Cancellation Terminates Job and Updates Status",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "List existing evaluations via API",
+          "expected": "Evaluations with pending/running status present",
+          "observed": "Found pending evaluation id=765ad646-6afa-40aa-aa86-ffa15a18f520"
+        },
+        {
+          "action": "DELETE /api/v1/evaluations/:id",
+          "expected": "Returns 200, status changes to cancelled",
+          "observed": "Returns 200 OK with {\"id\":\"765ad646-6afa-40aa-aa86-ffa15a18f520\",\"status\":\"cancelled\"}"
+        },
+        {
+          "action": "Verify DB status updated",
+          "expected": "status column in evaluations table = 'cancelled'",
+          "observed": "SELECT query returned status='cancelled', updated_at=2026-05-10 13:50:40.954358+00"
+        },
+        {
+          "action": "Verify Job terminated in K8s",
+          "expected": "No active jobs for cancelled evaluation in llm-eval namespace",
+          "observed": "kubectl get jobs -n llm-eval returned 'No resources found' (pending eval had no job created yet)"
+        },
+        {
+          "action": "Verify cannot cancel completed evaluation",
+          "expected": "DELETE returns 409 Conflict",
+          "observed": "DELETE on completed eval 8bb55603-42f1-4056-b073-6f805fcd5114 returned 409 Conflict with {\"error\":\"cannot cancel completed evaluation\"}"
+        }
+      ],
+      "evidence": {
+        "apiResponses": [
+          "end-to-end/cancellation/VAL-CROSS-004-delete-request.json"
+        ],
+        "databaseQueries": [
+          "end-to-end/cancellation/VAL-CROSS-004-db-status.txt"
+        ],
+        "kubernetesQueries": [
+          "end-to-end/cancellation/VAL-CROSS-004-k8s-jobs.txt"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "PostgreSQL password was not documented; needed to inspect init.sh to find default password 'eval_pass'",
+      "resolved": true,
+      "resolution": "Found password in init.sh service definition",
+      "affectedAssertions": ["VAL-CROSS-004"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested VAL-CROSS-004: PASS. DELETE cancelled pending evaluation, DB status updated to 'cancelled', K8s namespace empty (pending eval had no job yet). Also verified completed evaluations cannot be cancelled (409 Conflict)."
+}

@@ -1,0 +1,28 @@
+VAL-DB-004: Predictions Table Schema
+=====================================
+SQL: \d predictions
+
+Output:
+                              Table "public.predictions"
+     Column     |           Type           | Collation | Nullable |      Default       
+----------------+--------------------------+-----------+----------+--------------------
+ id             | uuid                     |           | not null | uuid_generate_v4()
+ evaluation_id  | uuid                     |           | not null | 
+ dataset_id     | uuid                     |           | not null | 
+ question_index | integer                  |           | not null | 
+ question       | text                     |           | not null | 
+ prediction     | text                     |           | not null | 
+ answer         | text                     |           | not null | 
+ correct        | boolean                  |           | not null | 
+ reasoning      | text                     |           |          | 
+ metadata       | jsonb                    |           |          | '{}'::jsonb
+ created_at     | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "predictions_pkey" PRIMARY KEY, btree (id)
+    "idx_predictions_dataset_id" btree (dataset_id)
+    "idx_predictions_evaluation_id" btree (evaluation_id)
+Foreign-key constraints:
+    "predictions_dataset_id_fkey" FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE RESTRICT
+    "predictions_evaluation_id_fkey" FOREIGN KEY (evaluation_id) REFERENCES evaluations(id) ON DELETE CASCADE
+
+RESULT: PASS - Columns present with NOT NULL constraints on question, prediction, answer, correct. Foreign key to evaluations(id).

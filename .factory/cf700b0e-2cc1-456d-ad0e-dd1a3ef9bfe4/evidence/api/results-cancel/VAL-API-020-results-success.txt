@@ -1,0 +1,30 @@
+VAL-API-020: Get Results Successfully
+When GET request is made for a completed task, the system returns HTTP 200 with full evaluation results.
+
+=== TEST: GET /api/v1/evaluations/8bb55603-42f1-4056-b073-6f805fcd5114/results ===
+
+Request:
+curl -s -w "\nHTTP_STATUS:%{http_code}" http://localhost:3100/api/v1/evaluations/8bb55603-42f1-4056-b073-6f805fcd5114/results
+
+Response:
+{
+  "results":[
+    {
+      "dataset_id":"6e9e9bcc-3d57-41af-97da-c975d5ab853d",
+      "dataset_name":"mmlu",
+      "accuracy":0.85,
+      "sample_count":0,
+      "metrics":{"f1":0.82,"precision":0.88},
+      "summary":"Test evaluation"
+    }
+  ],
+  "page":0,
+  "limit":0,
+  "total":0,
+  "pages":0
+}
+HTTP_STATUS:200
+
+Result: PASS
+- Status code: 200
+- Response contains results object with metrics

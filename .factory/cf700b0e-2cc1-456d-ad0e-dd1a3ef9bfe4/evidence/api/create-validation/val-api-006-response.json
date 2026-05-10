@@ -1,0 +1,2 @@
+{"error":"invalid dataset: invalid-dataset","valid_datasets":["ceval","gsm8k","hellaswag","humaneval","mmlu"]}
+---HTTP_STATUS:400---

@@ -1,0 +1,28 @@
+VAL-DB-002: Models Table Schema
+================================
+SQL: \d models
+
+Output:
+                               Table "public.models"
+   Column    |           Type           | Collation | Nullable |      Default       
+-------------+--------------------------+-----------+----------+--------------------
+ id          | uuid                     |           | not null | uuid_generate_v4()
+ name        | character varying(255)   |           | not null | 
+ type        | character varying(50)    |           | not null | 
+ provider    | character varying(50)    |           | not null | 
+ api_key_ref | character varying(255)   |           |          | 
+ config      | jsonb                    |           |          | '{}'::jsonb
+ created_at  | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+ updated_at  | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "models_pkey" PRIMARY KEY, btree (id)
+    "models_name_key" UNIQUE CONSTRAINT, btree (name)
+Check constraints:
+    "models_provider_check" CHECK (provider::text = ANY (ARRAY['openai'::character varying, 'anthropic'::character varying, 'dashscope'::character varying, 'qwen'::character varying, 'custom'::character varying]::text[]))
+    "models_type_check" CHECK (type::text = ANY (ARRAY['api'::character varying, 'local'::character varying]::text[]))
+Referenced by:
+    TABLE "evaluations" CONSTRAINT "evaluations_model_id_fkey" FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE RESTRICT
+Triggers:
+    update_models_updated_at BEFORE UPDATE ON models FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+
+RESULT: PASS - All columns present, CHECK constraints for type ('api'/'local') and provider, UNIQUE constraint on name.

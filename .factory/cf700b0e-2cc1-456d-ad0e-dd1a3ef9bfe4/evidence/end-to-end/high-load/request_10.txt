@@ -1,0 +1,1 @@
+Request 10: HTTP 202, Body: {"task_id":"7573670e-a6d2-44f3-9810-643b45932240","status":"pending","model":"gpt-4","dataset":"mmlu"}

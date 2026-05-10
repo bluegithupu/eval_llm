@@ -1,0 +1,28 @@
+{
+  "groupId": "val-api-017-rerun",
+  "milestone": "api",
+  "tool": "curl",
+  "isolationContext": {
+    "apiUrl": "http://localhost:3100",
+    "endpoint": "/api/v1/evaluations/:id/status"
+  },
+  "assertions": [
+    {
+      "id": "VAL-API-017",
+      "description": "Status Completed State - For a completed task, status endpoint returns status=completed and progress=100",
+      "status": "passed",
+      "evidence": {
+        "taskId": "8bb55603-42f1-4056-b073-6f805fcd5114",
+        "response": {
+          "id": "8bb55603-42f1-4056-b073-6f805fcd5114",
+          "status": "completed",
+          "progress": 100
+        }
+      }
+    }
+  ],
+  "summary": "VAL-API-017 fixed and verified: Completed evaluation now correctly returns progress=100",
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["curl", "jq"]
+}

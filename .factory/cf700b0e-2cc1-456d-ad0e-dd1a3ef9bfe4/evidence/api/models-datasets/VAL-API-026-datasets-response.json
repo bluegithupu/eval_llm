@@ -1,0 +1,1 @@
+{"datasets":[{"id":"mmlu","name":"MMLU","description":"Massive Multitask Language Understanding"},{"id":"hellaswag","name":"HellaSwag","description":"Commonsense NLI tasks"}]}

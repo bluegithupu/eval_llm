@@ -1,0 +1,95 @@
+{
+  "groupId": "api-health",
+  "testedAt": "2026-05-10T00:00:00Z",
+  "isolation": {
+    "apiUrl": "http://localhost:3100",
+    "testingTool": "curl",
+    "endpoints": ["/health", "/ready"],
+    "database": "eval-postgres on port 3105",
+    "redis": "eval-redis on port 3106"
+  },
+  "toolsUsed": ["curl", "docker"],
+  "assertions": [
+    {
+      "id": "VAL-API-027",
+      "title": "Health Check Returns 200",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "GET request to /health endpoint",
+          "expected": "HTTP 200 with status: healthy or status: ok",
+          "observed": "HTTP 200 with {\"status\":\"healthy\"}"
+        }
+      ],
+      "evidence": {
+        "command": "curl -s -w \"\\n\\nHTTP_STATUS: %{http_code}\\n\" http://localhost:3100/health",
+        "response": "{\"status\":\"healthy\"}\n\nHTTP_STATUS: 200",
+        "status": "healthy",
+        "httpCode": 200
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-028",
+      "title": "Readiness Check Returns 200 When Healthy",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "GET request to /ready endpoint",
+          "expected": "HTTP 200 with status: ready and dependency statuses",
+          "observed": "HTTP 200 with status: ready and both dependencies healthy"
+        }
+      ],
+      "evidence": {
+        "command": "curl -s -w \"\\n\\nHTTP_STATUS: %{http_code}\\n\" http://localhost:3100/ready",
+        "response": "{\"status\":\"ready\",\"dependencies\":{\"database\":{\"status\":\"healthy\"},\"redis\":{\"status\":\"healthy\"}}}\n\nHTTP_STATUS: 200",
+        "status": "ready",
+        "dependencies": {
+          "database": "healthy",
+          "redis": "healthy"
+        },
+        "httpCode": 200
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-029",
+      "title": "Readiness Check Returns 503 When Unhealthy",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Stop Redis container to simulate unhealthy dependency",
+          "expected": "Redis container stopped",
+          "observed": "Redis container eval-redis stopped successfully"
+        },
+        {
+          "action": "GET request to /ready endpoint with Redis unavailable",
+          "expected": "HTTP 503 with status: not_ready and failed dependency info",
+          "observed": "HTTP 503 with status: not_ready and redis unhealthy with connection refused error"
+        },
+        {
+          "action": "Restore Redis container and verify service recovery",
+          "expected": "HTTP 200 with status: ready after restoration",
+          "observed": "Redis container restarted, service returned to ready state"
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "docker stop eval-redis",
+          "curl -s -w \"\\n\\nHTTP_STATUS: %{http_code}\\n\" http://localhost:3100/ready",
+          "docker start eval-redis"
+        ],
+        "responseWhenUnhealthy": "{\"status\":\"not_ready\",\"dependencies\":{\"database\":{\"status\":\"healthy\"},\"redis\":{\"status\":\"unhealthy\",\"message\":\"dial tcp [::1]:3106: connect: connection refused\"}}}\n\nHTTP_STATUS: 503",
+        "responseAfterRestore": "{\"status\":\"ready\",\"dependencies\":{\"database\":{\"status\":\"healthy\"},\"redis\":{\"status\":\"healthy\"}}}\n\nHTTP_STATUS: 200",
+        "status": "not_ready",
+        "failedDependency": "redis",
+        "errorMessage": "dial tcp [::1]:3106: connect: connection refused",
+        "httpCode": 503
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed. All health and readiness endpoints function correctly. VAL-API-029 required stopping the Redis container to simulate an unhealthy state; the endpoint correctly returned 503 with detailed dependency failure information. Service was fully restored after testing."
+}

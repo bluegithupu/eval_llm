@@ -1,0 +1,164 @@
+VAL-DB-005 to VAL-DB-014: CRUD Operations Evidence
+==================================================
+
+VAL-DB-005: Create Evaluation
+-----------------------------
+SQL: INSERT INTO evaluations (id, model_id, dataset_ids, config) VALUES ('00000000-0000-0000-0000-000000000001', '22db9cde-754a-4cee-a65c-0623eb0cd672', ARRAY['6e9e9bcc-3d57-41af-97da-c975d5ab853d'::uuid], '{"test": true}') RETURNING id, model_id, dataset_ids, status, created_at, updated_at;
+
+Output:
+                  id                  |               model_id               |              dataset_ids               | status  |          created_at           |          updated_at           
+--------------------------------------+--------------------------------------+----------------------------------------+---------+-------------------------------+-------------------------------
+ 00000000-0000-0000-0000-000000000001 | 22db9cde-754a-4cee-a65c-0623eb0cd672 | {6e9e9bcc-3d57-41af-97da-c975d5ab853d} | pending | 2026-05-10 07:17:45.277549+00 | 2026-05-10 07:17:45.277549+00
+
+INSERT 0 1
+
+RESULT: PASS - Status defaults to 'pending', created_at/updated_at auto-populated.
+
+
+VAL-DB-006: Update Evaluation Status
+------------------------------------
+SQL: UPDATE evaluations SET status = 'running' WHERE id = '00000000-0000-0000-0000-000000000001' RETURNING id, status, started_at, updated_at;
+
+Output:
+                  id                  | status  |          started_at          |          updated_at          
+--------------------------------------+---------+------------------------------+------------------------------
+ 00000000-0000-0000-0000-000000000001 | running | 2026-05-10 07:18:00.71649+00 | 2026-05-10 07:18:00.71649+00
+
+UPDATE 1
+
+SQL: UPDATE evaluations SET status = 'completed' WHERE id = '00000000-0000-0000-0000-000000000001' RETURNING id, status, started_at, completed_at, updated_at;
+
+Output:
+                  id                  |  status   |          started_at          |         completed_at          |          updated_at           
+--------------------------------------+-----------+------------------------------+-------------------------------+-------------------------------
+ 00000000-0000-0000-0000-000000000001 | completed | 2026-05-10 07:18:00.71649+00 | 2026-05-10 07:18:15.412736+00 | 2026-05-10 07:18:15.412736+00
+
+UPDATE 1
+
+RESULT: PASS - started_at set on 'running' transition, completed_at set on 'completed' transition.
+
+
+VAL-DB-007: Insert Results with JSONB Metrics
+---------------------------------------------
+SQL: INSERT INTO results (id, evaluation_id, dataset_id, accuracy, metrics) VALUES ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', '6e9e9bcc-3d57-41af-97da-c975d5ab853d', 0.85, '{"precision": 0.85, "f1": 0.87}') RETURNING id, evaluation_id, accuracy, metrics, metrics->>'precision';
+
+Output:
+                  id                  |            evaluation_id             | accuracy |             metrics             | ?column? 
+--------------------------------------+--------------------------------------+----------+---------------------------------+----------
+ 00000000-0000-0000-0000-000000000002 | 00000000-0000-0000-0000-000000000001 |   0.8500 | {"f1": 0.87, "precision": 0.85} | 0.85
+
+INSERT 0 1
+
+RESULT: PASS - JSONB metrics inserted, metrics->>'precision' returns '0.85'.
+
+
+VAL-DB-008: Batch Insert Predictions
+------------------------------------
+SQL: INSERT INTO predictions (id, evaluation_id, dataset_id, question_index, question, prediction, answer, correct) VALUES ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', '6e9e9bcc-3d57-41af-97da-c975d5ab853d', 1, 'What is 2+2?', '4', '4', true), ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', '6e9e9bcc-3d57-41af-97da-c975d5ab853d', 2, 'What is 3+3?', '6', '6', true), ('00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', '6e9e9bcc-3d57-41af-97da-c975d5ab853d', 3, 'What is 5+5?', '11', '10', false) RETURNING id, evaluation_id, question, correct;
+
+Output:
+                  id                  |            evaluation_id             |   question   | correct 
+--------------------------------------+--------------------------------------+--------------+---------
+ 00000000-0000-0000-0000-000000000010 | 00000000-0000-0000-0000-000000000001 | What is 2+2? | t
+ 00000000-0000-0000-0000-000000000011 | 00000000-0000-0000-0000-000000000001 | What is 3+3? | t
+ 00000000-0000-0000-0000-000000000012 | 00000000-0000-0000-0000-000000000001 | What is 5+5? | f
+
+INSERT 0 3
+
+RESULT: PASS - 3 predictions inserted with correct evaluation_id.
+
+
+VAL-DB-009: Paginated Evaluation List
+-------------------------------------
+SQL: SELECT id, status, created_at FROM evaluations ORDER BY created_at DESC LIMIT 10 OFFSET 0;
+
+Output:
+                  id                  |  status   |          created_at           
+--------------------------------------+-----------+-------------------------------
+ 00000000-0000-0000-0000-000000000001 | completed | 2026-05-10 07:17:45.277549+00
+
+(1 row)
+
+RESULT: PASS - Pagination query works, ordered by created_at DESC.
+
+
+VAL-DB-010: Filter Evaluations by Status
+----------------------------------------
+SQL: SELECT id, status, created_at FROM evaluations WHERE status = 'completed';
+
+Output:
+                  id                  |  status   |          created_at           
+--------------------------------------+-----------+-------------------------------
+ 00000000-0000-0000-0000-000000000001 | completed | 2026-05-10 07:17:45.277549+00
+
+(1 row)
+
+RESULT: PASS - Filter returns only completed evaluations.
+
+
+VAL-DB-011: Foreign Key Enforcement - Results
+---------------------------------------------
+SQL: INSERT INTO results (id, evaluation_id, dataset_id, accuracy) VALUES ('00000000-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '6e9e9bcc-3d57-41af-97da-c975d5ab853d', 0.5);
+
+Output:
+ERROR:  insert or update on table "results" violates foreign key constraint "results_evaluation_id_fkey"
+DETAIL:  Key (evaluation_id)=(aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa) is not present in table "evaluations".
+
+RESULT: PASS - Foreign key violation error as expected.
+
+
+VAL-DB-012: Query JSONB Metrics Fields
+--------------------------------------
+SQL: SELECT id, evaluation_id, accuracy, metrics FROM results WHERE metrics->>'f1' = '0.87';
+
+Output:
+                  id                  |            evaluation_id             | accuracy |             metrics             
+--------------------------------------+--------------------------------------+----------+---------------------------------
+ 00000000-0000-0000-0000-000000000002 | 00000000-0000-0000-0000-000000000001 |   0.8500 | {"f1": 0.87, "precision": 0.85}
+
+(1 row)
+
+RESULT: PASS - JSONB query returns correct results.
+
+
+VAL-DB-013: Index on Evaluations Status
+---------------------------------------
+SQL: SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'evaluations';
+
+Output:
+         indexname          |                                          indexdef                                           
+----------------------------+---------------------------------------------------------------------------------------------
+ evaluations_pkey           | CREATE UNIQUE INDEX evaluations_pkey ON public.evaluations USING btree (id)
+ idx_evaluations_status     | CREATE INDEX idx_evaluations_status ON public.evaluations USING btree (status)
+ idx_evaluations_created_at | CREATE INDEX idx_evaluations_created_at ON public.evaluations USING btree (created_at DESC)
+ idx_evaluations_model_id   | CREATE INDEX idx_evaluations_model_id ON public.evaluations USING btree (model_id)
+
+(4 rows)
+
+SQL: SET enable_seqscan = off; EXPLAIN ANALYZE SELECT * FROM evaluations WHERE status = 'completed';
+
+Output:
+                                                              QUERY PLAN                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_evaluations_status on evaluations  (cost=0.12..8.14 rows=1 width=164) (actual time=0.008..0.014 rows=1 loops=1)
+   Index Cond: ((status)::text = 'completed'::text)
+ Planning Time: 0.352 ms
+ Execution Time: 0.040 ms
+
+(4 rows)
+
+RESULT: PASS - Index idx_evaluations_status exists and is used when seqscan disabled.
+
+
+VAL-DB-014: Connection Pool Max Connections
+-------------------------------------------
+SQL: SELECT count(*) FROM pg_stat_activity WHERE datname = 'evaluations';
+
+Output:
+ count 
+-------
+     2
+
+(1 row)
+
+RESULT: PASS - 2 connections active, within 25 max limit.

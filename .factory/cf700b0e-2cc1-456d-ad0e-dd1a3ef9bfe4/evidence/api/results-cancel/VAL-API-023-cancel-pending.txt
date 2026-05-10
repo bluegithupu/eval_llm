@@ -1,0 +1,32 @@
+VAL-API-023: Cancel Running Task Successfully
+When DELETE request is made for a running or pending task, the system cancels it and returns HTTP 200 or 204.
+
+=== TEST: DELETE /api/v1/evaluations/09e5dafd-8279-4286-afb8-4a009f011648 ===
+
+Request:
+curl -s -X DELETE -w "\nHTTP_STATUS:%{http_code}" http://localhost:3100/api/v1/evaluations/09e5dafd-8279-4286-afb8-4a009f011648
+
+Response:
+{
+  "id":"09e5dafd-8279-4286-afb8-4a009f011648",
+  "status":"cancelled"
+}
+HTTP_STATUS:200
+
+=== VERIFICATION: Check status shows cancelled ===
+
+Request:
+curl -s http://localhost:3100/api/v1/evaluations/09e5dafd-8279-4286-afb8-4a009f011648/status
+
+Response:
+{
+  "id":"09e5dafd-8279-4286-afb8-4a009f011648",
+  "status":"cancelled",
+  "progress":0,
+  "cancelled_at":"2026-05-10T16:45:29+08:00"
+}
+
+Result: PASS
+- DELETE returns HTTP 200
+- Status changed to "cancelled"
+- cancelled_at timestamp is present

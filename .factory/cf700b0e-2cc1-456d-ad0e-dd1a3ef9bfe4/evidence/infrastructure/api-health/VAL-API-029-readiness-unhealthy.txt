@@ -1,0 +1,36 @@
+=== VAL-API-029: Readiness Check Returns 503 When Unhealthy ===
+
+Step 1: Stop Redis container to simulate unhealthy dependency
+Command:
+docker stop eval-redis
+
+Output:
+eval-redis
+
+Step 2: Test readiness endpoint with Redis unavailable
+Command:
+curl -s -w "\n\nHTTP_STATUS: %{http_code}\n" http://localhost:3100/ready
+
+Response:
+{"status":"not_ready","dependencies":{"database":{"status":"healthy"},"redis":{"status":"unhealthy","message":"dial tcp [::1]:3106: connect: connection refused"}}}
+
+HTTP_STATUS: 503
+
+Step 3: Restore Redis container
+Command:
+docker start eval-redis
+
+Output:
+eval-redis
+
+Step 4: Verify service restored
+Command:
+sleep 2 && curl -s -w "\n\nHTTP_STATUS: %{http_code}\n" http://localhost:3100/ready
+
+Response:
+{"status":"ready","dependencies":{"database":{"status":"healthy"},"redis":{"status":"healthy"}}}
+
+HTTP_STATUS: 200
+
+=== VERDICT: PASS ===
+Evidence: HTTP 503 when Redis unavailable, status: "not_ready" with failed dependency info, restored successfully

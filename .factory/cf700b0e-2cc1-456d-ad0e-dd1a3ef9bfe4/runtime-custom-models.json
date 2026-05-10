@@ -1,0 +1,81 @@
+{
+  "customModels": [
+    {
+      "model": "claude-opus-4-6-gemini",
+      "id": "custom:Opus-4.6-[duojie.games]-0",
+      "index": 0,
+      "baseUrl": "https://api.duojie.games",
+      "apiKey": "sk-BC3wrHA80oDPbv9lI9DKL19EJPg78hSbFLNC4EXEAmumsYkR",
+      "displayName": "Opus 4.6 [duojie.games]",
+      "maxOutputTokens": 8192,
+      "noImageSupport": false,
+      "provider": "anthropic"
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "id": "custom:Sonnet-4.6-[duojie.games]-0",
+      "index": 1,
+      "baseUrl": "https://api.duojie.games",
+      "apiKey": "sk-BC3wrHA80oDPbv9lI9DKL19EJPg78hSbFLNC4EXEAmumsYkR",
+      "displayName": "Sonnet 4.6 [duojie.games]",
+      "maxOutputTokens": 8192,
+      "noImageSupport": false,
+      "provider": "anthropic"
+    },
+    {
+      "model": "glm-5",
+      "id": "custom:GLM-5-[duojie.games]-0",
+      "index": 2,
+      "baseUrl": "https://api.duojie.games",
+      "apiKey": "sk-BC3wrHA80oDPbv9lI9DKL19EJPg78hSbFLNC4EXEAmumsYkR",
+      "displayName": "GLM-5 [duojie.games]",
+      "maxOutputTokens": 8192,
+      "noImageSupport": false,
+      "provider": "anthropic"
+    },
+    {
+      "model": "claude-sonnet-4-5",
+      "id": "custom:Sonnet-4.5-[duojie.games]-0",
+      "index": 3,
+      "baseUrl": "https://api.duojie.games",
+      "apiKey": "sk-BC3wrHA80oDPbv9lI9DKL19EJPg78hSbFLNC4EXEAmumsYkR",
+      "displayName": "Sonnet 4.5 [duojie.games]",
+      "maxOutputTokens": 8192,
+      "noImageSupport": false,
+      "provider": "anthropic"
+    },
+    {
+      "model": "gpt-5.4",
+      "id": "custom:GPT-5.4-[duojie.games]-0",
+      "index": 4,
+      "baseUrl": "https://api.duojie.games/v1",
+      "apiKey": "sk-BC3wrHA80oDPbv9lI9DKL19EJPg78hSbFLNC4EXEAmumsYkR",
+      "displayName": "GPT 5.4 [duojie.games]",
+      "maxOutputTokens": 8192,
+      "noImageSupport": true,
+      "provider": "anthropic"
+    },
+    {
+      "model": "gemini-3.1-pro",
+      "id": "custom:Gemini-3.1-Pro-[duojie.games]-0",
+      "index": 5,
+      "baseUrl": "https://api.duojie.games/v1",
+      "apiKey": "sk-BC3wrHA80oDPbv9lI9DKL19EJPg78hSbFLNC4EXEAmumsYkR",
+      "displayName": "Gemini 3.1 Pro [duojie.games]",
+      "maxOutputTokens": 8192,
+      "noImageSupport": false,
+      "provider": "openai"
+    },
+    {
+      "model": "MiniMax-M2.7",
+      "id": "custom:Minimax-2.7-[Minimax]-0",
+      "index": 0,
+      "baseUrl": "https://api.minimaxi.com/anthropic",
+      "apiKey": "sk-cp-ZVlJqZtX_GEOAqrSJ7f3563UePP4ksz0tpnT-tB6wQXI0-Vtz5OE2n5qrJM3dEP3FwfFWUwMta2FOYuCnJWI1Jhao6xOgBRvJBEHU-SkwN13_veuxOUd7Js",
+      "displayName": "Minimax-2.7 [Minimax]",
+      "maxOutputTokens": 64000,
+      "noImageSupport": false,
+      "provider": "anthropic"
+    }
+  ]
+}

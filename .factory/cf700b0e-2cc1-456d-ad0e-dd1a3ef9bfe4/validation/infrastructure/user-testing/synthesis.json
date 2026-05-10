@@ -1,0 +1,69 @@
+{
+  "milestone": "infrastructure",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-API-027",
+    "VAL-API-028",
+    "VAL-API-029",
+    "VAL-DB-001",
+    "VAL-DB-002",
+    "VAL-DB-003",
+    "VAL-DB-004",
+    "VAL-DB-005",
+    "VAL-DB-006",
+    "VAL-DB-007",
+    "VAL-DB-008",
+    "VAL-DB-009",
+    "VAL-DB-010",
+    "VAL-DB-011",
+    "VAL-DB-012",
+    "VAL-DB-013",
+    "VAL-DB-014"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added Flow Validator Guidance sections for API Endpoints and PostgreSQL Database surfaces with isolation rules and testing instructions",
+      "source": "setup"
+    }
+  ],
+  "previousRound": null,
+  "flowReports": [
+    {
+      "groupId": "api-health",
+      "path": "validation/infrastructure/user-testing/flows/api-health.json",
+      "assertionsCount": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "groupId": "postgres-db",
+      "path": "validation/infrastructure/user-testing/flows/postgres-db.json",
+      "assertionsCount": 14,
+      "passed": 14,
+      "failed": 0
+    }
+  ],
+  "frictions": [
+    {
+      "description": "VAL-DB-013: With small test data, PostgreSQL optimizer chooses Seq Scan over Index Scan even though index exists. This is correct optimizer behavior for small tables.",
+      "resolution": "Verified index exists via pg_indexes query. Forced Index Scan with SET enable_seqscan=off to confirm index is usable.",
+      "source": "postgres-db flow report"
+    }
+  ],
+  "servicesStarted": [
+    "eval-postgres (PostgreSQL on port 3105)",
+    "eval-redis (Redis on port 3106)",
+    "API server on port 3100"
+  ],
+  "testingToolsUsed": ["curl", "psql", "docker"]
+}

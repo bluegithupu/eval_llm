@@ -1,0 +1,89 @@
+{
+  "groupId": "results-cancel",
+  "testedAt": "2026-05-10T16:46:45+08:00",
+  "isolation": {
+    "apiUrl": "http://localhost:3100"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-020",
+      "title": "Get Results Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "Set up test data - created evaluation and marked as completed with results in DB", "expected": "Completed evaluation exists in DB", "observed": "Evaluation 8bb55603-42f1-4056-b073-6f805fcd5114 set to completed with results" },
+        { "action": "GET /api/v1/evaluations/:id/results for completed task", "expected": "HTTP 200 with results object containing metrics", "observed": "HTTP 200 with results array containing accuracy, metrics, summary" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/8bb55603-42f1-4056-b073-6f805fcd5114/results -> 200",
+        "response": "{\"results\":[{\"dataset_id\":\"6e9e9bcc-3d57-41af-97da-c975d5ab853d\",\"dataset_name\":\"mmlu\",\"accuracy\":0.85,\"sample_count\":0,\"metrics\":{\"f1\":0.82,\"precision\":0.88},\"summary\":\"Test evaluation\"}],\"page\":0,\"limit\":0,\"total\":0,\"pages\":0}"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-021",
+      "title": "Results Not Ready",
+      "status": "pass",
+      "steps": [
+        { "action": "GET /api/v1/evaluations/:id/results for pending task", "expected": "HTTP 409 or 425 with error indicating results not ready", "observed": "HTTP 409 with error message 'results not available: evaluation is pending'" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/765ad646-6afa-40aa-aa86-ffa15a18f520/results -> 409",
+        "response": "{\"error\":\"results not available: evaluation is pending\"}"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-022",
+      "title": "Results Include Accuracy Metric",
+      "status": "pass",
+      "steps": [
+        { "action": "GET /api/v1/evaluations/:id/results for completed task", "expected": "Response includes accuracy score as percentage or decimal", "observed": "Response includes 'accuracy': 0.85 (decimal format 0-1 range)" }
+      ],
+      "evidence": {
+        "network": "GET /api/v1/evaluations/8bb55603-42f1-4056-b073-6f805fcd5114/results -> 200",
+        "response": "Results contain accuracy: 0.85, plus additional metrics (f1, precision) in metrics object"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-023",
+      "title": "Cancel Running Task Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations to create a task", "expected": "Task created with pending status", "observed": "Task 09e5dafd-8279-4286-afb8-4a009f011648 created" },
+        { "action": "DELETE /api/v1/evaluations/:id for pending task", "expected": "HTTP 200 or 204, status changed to cancelled", "observed": "HTTP 200 with status 'cancelled'" },
+        { "action": "GET /api/v1/evaluations/:id/status to verify cancellation", "expected": "Status shows cancelled with cancelled_at timestamp", "observed": "Status 'cancelled' with cancelled_at timestamp present" }
+      ],
+      "evidence": {
+        "network": "DELETE /api/v1/evaluations/09e5dafd-8279-4286-afb8-4a009f011648 -> 200",
+        "statusCheck": "GET /api/v1/evaluations/09e5dafd-8279-4286-afb8-4a009f011648/status -> {\"id\":\"...\",\"status\":\"cancelled\",\"progress\":0,\"cancelled_at\":\"2026-05-10T16:45:29+08:00\"}"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-024",
+      "title": "Cancel Already Completed Task",
+      "status": "pass",
+      "steps": [
+        { "action": "Set up test data - existing completed evaluation", "expected": "Evaluation marked as completed in DB", "observed": "Evaluation 8bb55603-42f1-4056-b073-6f805fcd5114 set to completed" },
+        { "action": "DELETE /api/v1/evaluations/:id for completed task", "expected": "HTTP 409 Conflict with error indicating task cannot be cancelled", "observed": "HTTP 409 with error 'cannot cancel completed evaluation'" }
+      ],
+      "evidence": {
+        "network": "DELETE /api/v1/evaluations/8bb55603-42f1-4056-b073-6f805fcd5114 -> 409",
+        "response": "{\"error\":\"cannot cancel completed evaluation\"}"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "No completed evaluations exist in the system - required DB manipulation to create test data",
+      "resolved": true,
+      "resolution": "Used direct PostgreSQL UPDATE to set status='completed' and INSERT results for test evaluation",
+      "affectedAssertions": ["VAL-API-020", "VAL-API-022", "VAL-API-024"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assertions: all passed. VAL-API-020 (get results success), VAL-API-021 (results not ready conflict), VAL-API-022 (accuracy metric present), VAL-API-023 (cancel pending task), VAL-API-024 (cancel completed returns 409). No blockers encountered."
+}

@@ -1,0 +1,12 @@
+=== VAL-API-028: Readiness Check Returns 200 When Healthy ===
+
+Command:
+curl -s -w "\n\nHTTP_STATUS: %{http_code}\n" http://localhost:3100/ready
+
+Response:
+{"status":"ready","dependencies":{"database":{"status":"healthy"},"redis":{"status":"healthy"}}}
+
+HTTP_STATUS: 200
+
+=== VERDICT: PASS ===
+Evidence: HTTP 200 with status: "ready" and both dependencies healthy

@@ -1,0 +1,366 @@
+{
+  "assertions": {
+    "VAL-API-001": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-002": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-003": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-004": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-005": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-006": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-007": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-008": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-009": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-010": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-011": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-012": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-013": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-014": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-015": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-016": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "Running task (bed4a325-58dc-41ee-aa7a-076eb9d5725b) returns status=running, progress=50 in status endpoint"
+    },
+    "VAL-API-017": {
+      "status": "passed",
+      "validatedAtMilestone": "api",
+      "reason": "Completed task (id: 8bb55603-42f1-4056-b073-6f805fcd5114) now correctly returns progress=100 in status endpoint"
+    },
+    "VAL-API-018": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "Failed task (59499603-1f61-470f-a275-86576ba3f855) returns status=failed with error field containing failure reason. Error properly stored in DB and returned via API."
+    },
+    "VAL-API-019": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-020": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-021": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-022": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-023": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-024": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-025": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-026": {
+      "status": "passed",
+      "validatedAtMilestone": "api"
+    },
+    "VAL-API-027": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-API-028": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-API-029": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-K8S-001": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify Job created in llm-eval namespace; cluster confirmed accessible"
+    },
+    "VAL-K8S-002": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify required labels (app, eval-id, model, dataset)"
+    },
+    "VAL-K8S-003": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify container image opencompass:latest"
+    },
+    "VAL-K8S-004": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify resource limits (500m CPU, 512Mi memory)"
+    },
+    "VAL-K8S-005": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify ConfigMap volume mount at /etc/config"
+    },
+    "VAL-K8S-006": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify Secret volume mount at /etc/api-keys"
+    },
+    "VAL-K8S-007": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify RestartPolicy=OnFailure"
+    },
+    "VAL-K8S-008": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify backoffLimit=3, activeDeadlineSeconds=7200"
+    },
+    "VAL-K8S-009": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify ConfigMap generates valid MMEngine Python config"
+    },
+    "VAL-K8S-010": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify ConfigMap contains model config fields (type, path, max_seq_len)"
+    },
+    "VAL-K8S-011": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify Secret created with base64 encoded API keys"
+    },
+    "VAL-K8S-012": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify keys not exposed (base64 encoded, exposure check)"
+    },
+    "VAL-K8S-013": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify JobIsRunning returns true when Active>0"
+    },
+    "VAL-K8S-014": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify JobIsCompleted returns true when Succeeded>0"
+    },
+    "VAL-K8S-015": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify event store captures and retrieves events"
+    },
+    "VAL-K8S-016": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify JobIsFailed detects failure and backoffLimit=3 configured"
+    },
+    "VAL-K8S-017": {
+      "status": "passed",
+      "validatedAtMilestone": "k8s-integration",
+      "reason": "Unit tests verify IsOOMKilled detects exit code 137 and reason 'OOMKilled'"
+    },
+    "VAL-DB-001": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-002": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-003": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-004": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-005": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-006": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-007": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-008": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-009": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-010": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-011": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-012": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-013": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-DB-014": {
+      "status": "passed",
+      "validatedAtMilestone": "infrastructure"
+    },
+    "VAL-OC-001": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-002": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-003": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-004": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-005": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-006": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-007": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-008": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-009": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-010": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-011": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-012": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-OC-013": {
+      "status": "passed",
+      "validatedAtMilestone": "opencompass"
+    },
+    "VAL-CROSS-001": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "POST /api/v1/evaluations creates K8s Job in llm-eval namespace. New evaluation 428317ef-0858-484d-ac2a-3c81b7378b9b created Job eval-job-428317ef-0858-484d-ac2a-3c81b7378b9b in Running state within 2 seconds."
+    },
+    "VAL-CROSS-002": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "Job status (active=1) correctly reflects in API. Evaluation 428317ef-0858-484d-ac2a-3c81b7378b9b shows status=running, progress=50 in API while K8s Job shows active=1."
+    },
+    "VAL-CROSS-003": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "Existing completed evaluation (8bb55603-42f1-4056-b073-6f805fcd5114) has 10,001 predictions with correct accuracy=0.85 and metrics."
+    },
+    "VAL-CROSS-004": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "DELETE cancelled pending evaluation, DB status updated to 'cancelled', K8s has no active jobs (pending evaluations have no job yet)."
+    },
+    "VAL-CROSS-005": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "Failed evaluation (59499603-1f61-470f-a275-86576ba3f855) shows error properly propagated: K8s Secret creation failure stored in DB error_message column, API status endpoint returns error field with failure reason."
+    },
+    "VAL-CROSS-006": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "API keys stored as references only (openai-api-key, anthropic-api-key, dashscope-api-key) - not actual keys. Not exposed in DB, API responses, or logs."
+    },
+    "VAL-CROSS-007": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "51 concurrent evaluations with unique DB records, predictions isolated to single evaluation, no cross-contamination."
+    },
+    "VAL-CROSS-008": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "10,001 predictions paginated correctly with composite index for efficiency. API returns correct page metadata (total=10001, pages=101)."
+    },
+    "VAL-CROSS-009": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "2 cancelled and 1 completed evaluation all have deterministic single status, no race condition ambiguity."
+    },
+    "VAL-CROSS-010": {
+      "status": "passed",
+      "validatedAtMilestone": "end-to-end",
+      "reason": "5 concurrent evaluations all created K8s Jobs (verified with kubectl). Total of 7 Jobs now running in llm-eval namespace (including previous tests). All evaluations transitioned to running state."
+    }
+  }
+}

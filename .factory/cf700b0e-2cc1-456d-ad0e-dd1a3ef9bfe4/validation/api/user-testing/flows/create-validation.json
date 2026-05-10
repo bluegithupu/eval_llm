@@ -1,0 +1,116 @@
+{
+  "groupId": "create-validation",
+  "testedAt": "2026-05-10T15:35:00Z",
+  "isolation": {
+    "apiUrl": "http://localhost:3100",
+    "testingTool": "curl"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-001",
+      "title": "Create Evaluation Task Successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations with {model:\"gpt-4\", dataset:\"mmlu\"}", "expected": "HTTP 202 Accepted with task_id", "observed": "HTTP 202 Accepted with task_id in JSON body" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-001-response.json",
+        "statusCode": 202,
+        "taskIdPresent": true,
+        "locationHeader": "not tested (async task - URL constructed from task_id)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-002",
+      "title": "Create Task Returns Async Accepted Status",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations", "expected": "HTTP 202 Accepted (async)", "observed": "HTTP 202 Accepted" },
+        { "action": "Check response body", "expected": "status: pending or queued", "observed": "status: \"pending\"" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-001-response.json",
+        "statusCode": 202,
+        "statusInBody": "pending"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-003",
+      "title": "Missing Model Field Validation",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations with {dataset:\"mmlu\"} (no model)", "expected": "HTTP 400 Bad Request", "observed": "HTTP 400 Bad Request" },
+        { "action": "Check error message", "expected": "error field mentioning 'model' as required", "observed": "{\"error\":\"model is required\"}" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-003-response.json",
+        "statusCode": 400,
+        "errorMessageContainsModel": true
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-004",
+      "title": "Missing Dataset Field Validation",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations with {model:\"gpt-4\"} (no dataset)", "expected": "HTTP 400 Bad Request", "observed": "HTTP 400 Bad Request" },
+        { "action": "Check error message", "expected": "error field mentioning 'dataset' as required", "observed": "{\"error\":\"dataset is required\"}" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-004-response.json",
+        "statusCode": 400,
+        "errorMessageContainsDataset": true
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-005",
+      "title": "Invalid Model Value Validation",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations with model:\"invalid-model\"", "expected": "HTTP 400 Bad Request with valid models list", "observed": "HTTP 400 Bad Request with valid_models array" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-005-response.json",
+        "statusCode": 400,
+        "validModelsListed": ["claude-3-haiku","claude-3-opus","claude-3-sonnet","gpt-3.5-turbo","gpt-4","gpt-4-turbo","qwen-max","qwen-plus","qwen-turbo"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-006",
+      "title": "Invalid Dataset Value Validation",
+      "status": "pass",
+      "steps": [
+        { "action": "POST /api/v1/evaluations with dataset:\"invalid-dataset\"", "expected": "HTTP 400 Bad Request with valid datasets list", "observed": "HTTP 400 Bad Request with valid_datasets array" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-006-response.json",
+        "statusCode": 400,
+        "validDatasetsListed": ["ceval","gsm8k","hellaswag","humaneval","mmlu"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-007",
+      "title": "Task ID Format Validation (UUID v4)",
+      "status": "pass",
+      "steps": [
+        { "action": "Create evaluation and extract task_id", "expected": "UUID v4 format [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", "observed": "188818f8-a176-40b0-890c-92feb17d08a2 matches UUID v4 pattern" }
+      ],
+      "evidence": {
+        "responseFile": "api/create-validation/val-api-007-response.txt",
+        "taskId": "188818f8-a176-40b0-890c-92feb17d08a2",
+        "uuidV4Valid": true
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions (VAL-API-001 through VAL-API-007): all passed. POST /api/v1/evaluations correctly returns HTTP 202 for valid requests, proper validation errors for missing/invalid fields, and valid UUID v4 task IDs."
+}

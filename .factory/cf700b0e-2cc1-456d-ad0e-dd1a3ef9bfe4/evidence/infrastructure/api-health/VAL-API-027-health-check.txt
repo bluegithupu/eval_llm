@@ -1,0 +1,12 @@
+=== VAL-API-027: Health Check Returns 200 ===
+
+Command:
+curl -s -w "\n\nHTTP_STATUS: %{http_code}\n" http://localhost:3100/health
+
+Response:
+{"status":"healthy"}
+
+HTTP_STATUS: 200
+
+=== VERDICT: PASS ===
+Evidence: HTTP 200 with status: "healthy"

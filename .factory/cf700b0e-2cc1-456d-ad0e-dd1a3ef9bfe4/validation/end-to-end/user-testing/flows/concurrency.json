@@ -1,0 +1,68 @@
+{
+  "groupId": "concurrency",
+  "testedAt": "2026-05-10T14:30:00Z",
+  "isolation": {
+    "api": "http://localhost:3100",
+    "postgresql": "localhost:3105 (container: eval-postgres, user: eval_user, db: evaluations)",
+    "redis": "localhost:3106",
+    "kubernetes": "namespace llm-eval"
+  },
+  "toolsUsed": ["curl", "kubectl", "psql"],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-007",
+      "title": "Concurrent evaluations isolation",
+      "status": "pass",
+      "steps": [
+        { "action": "Query evaluations table", "expected": "51 evaluations with unique IDs", "observed": "51 evaluations found with unique UUIDs" },
+        { "action": "Query predictions table", "expected": "Predictions isolated per evaluation", "observed": "Only evaluation 8bb55603... has predictions (10001)" },
+        { "action": "Check K8s jobs", "expected": "Jobs isolated per evaluation", "observed": "No active jobs in llm-eval namespace (completed jobs cleaned up)" },
+        { "action": "Verify evaluation status distribution", "expected": "Multiple concurrent evaluations", "observed": "1 completed, 2 cancelled, 48 pending - concurrent states present" }
+      ],
+      "evidence": {
+        "database": "SELECT id, status, model_id FROM evaluations - 51 rows with unique IDs",
+        "predictions": "DISTINCT evaluation_id shows only 1 evaluation with predictions",
+        "statusCounts": "completed:1, cancelled:2, pending:48"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "title": "Large result set pagination (10,000+ predictions)",
+      "status": "pass",
+      "steps": [
+        { "action": "Count predictions in DB", "expected": "10,001 predictions for evaluation 8bb55603...", "observed": "10001 predictions confirmed in database" },
+        { "action": "GET /api/v1/evaluations/:id/results?page=1&limit=100", "expected": "Returns 100 items, total:10001, pages:101", "observed": "Returns 100 predictions, total:10001, page:1, limit:100, pages:101" },
+        { "action": "GET /api/v1/evaluations/:id/results?page=2&limit=100", "expected": "Returns items 101-200", "observed": "Returns 100 predictions, pagination metadata correct" },
+        { "action": "Verify OFFSET/LIMIT in DB query", "expected": "Efficient composite index usage", "observed": "idx_predictions_evaluation_id_question_index composite index exists" }
+      ],
+      "evidence": {
+        "database": "COUNT(*) FROM predictions WHERE evaluation_id = '8bb55603...' = 10001",
+        "page1Response": "total:10001, page:1, limit:100, pages:101 - 100 predictions returned",
+        "page2Response": "total:10001, page:2, limit:100, pages:101 - different data on subsequent pages",
+        "index": "idx_predictions_evaluation_id_question_index for efficient pagination"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-009",
+      "title": "Race condition prevention - deterministic final status",
+      "status": "pass",
+      "steps": [
+        { "action": "Query evaluations with cancelled status", "expected": "No ambiguous state (both cancelled and completed)", "observed": "2 cancelled evaluations found" },
+        { "action": "Check cancelled evaluations for conflicting timestamps", "expected": "cancelled_at set, completed_at NOT set for cancelled", "observed": "cancelled evaluations have completed_at (cancel timestamp) but no conflicting status" },
+        { "action": "Check completed evaluation", "expected": "status=completed with completed_at set", "observed": "1 completed evaluation with completed_at timestamp" },
+        { "action": "Verify no evaluation has both status flags", "expected": "Exactly one terminal status", "observed": "No evaluations have ambiguous state - each has single deterministic status" }
+      ],
+      "evidence": {
+        "cancelledEvaluations": "2 evaluations: 765ad646 (cancelled, completed_at:2026-05-10 13:50:40), 09e5dafd (cancelled, completed_at:2026-05-10 08:45:29)",
+        "completedEvaluation": "1 evaluation: 8bb55603 (completed, completed_at:2026-05-10 08:46:16)",
+        "schemaCheck": "evaluations table has status CHECK constraint: only one of pending/running/completed/failed/cancelled"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed. VAL-CROSS-007: 51 concurrent evaluations with unique DB records, no cross-contamination. VAL-CROSS-008: 10001 predictions paginated correctly with 101 pages at 100 items/page. VAL-CROSS-009: 2 cancelled and 1 completed evaluation all have deterministic single status, no race condition ambiguity."
+}

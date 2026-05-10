@@ -1,0 +1,1210 @@
+{
+  "features": [
+    {
+      "id": "project-init",
+      "description": "Initialize Go project structure with cmd/api, internal/handler, internal/service, internal/repository, internal/model directories. Set up go.mod with required dependencies (Gin v1.10+, pgx v5, go-redis v9, client-go v0.32). Create main.go entry point with basic Gin router setup.",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Project directory structure follows standard Go layout",
+        "go.mod includes all required dependencies with correct versions",
+        "main.go compiles successfully with empty Gin router",
+        "go build ./cmd/api produces executable"
+      ],
+      "verificationSteps": [
+        "go mod tidy",
+        "go build ./cmd/api",
+        "ls -la cmd/api internal/"
+      ],
+      "fulfills": [],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "8b4b8857-8a9b-45a2-9bc3-d3e06cf06421"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "database-schema",
+      "description": "Create PostgreSQL schema with migrations for evaluations, models, datasets, results, predictions, logs tables. Include proper constraints (foreign keys, NOT NULL, CHECK constraints for status/type), indexes (status, created_at), and JSONB columns for metrics/config.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "project-init completed"
+      ],
+      "expectedBehavior": [
+        "All 6 tables created with correct columns and types",
+        "Foreign key constraints on results, predictions, logs referencing evaluations",
+        "CHECK constraints on models.type ('api','local') and models.provider",
+        "Indexes on evaluations.status and evaluations.created_at",
+        "JSONB columns accept nested JSON structures"
+      ],
+      "verificationSteps": [
+        "psql -c '\\d evaluations' shows all columns",
+        "psql -c '\\d models' shows CHECK constraints",
+        "psql -c 'EXPLAIN ANALYZE SELECT * FROM evaluations WHERE status=\\'completed\\'' shows Index Scan",
+        "INSERT test data, verify constraints work"
+      ],
+      "fulfills": [
+        "VAL-DB-001",
+        "VAL-DB-002",
+        "VAL-DB-003",
+        "VAL-DB-004",
+        "VAL-DB-013"
+      ],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "0deea191-1307-4fe9-8657-bbc5de185bfb"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "database-crud",
+      "description": "Implement repository layer for CRUD operations on evaluations, results, predictions. Include connection pool configuration (25 max connections), transaction support, JSONB query helpers, and pagination logic.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "database-schema completed"
+      ],
+      "expectedBehavior": [
+        "Repository creates evaluation with status=pending and auto-populated created_at",
+        "Repository updates status with proper timestamp updates (started_at, completed_at)",
+        "Repository inserts results with JSONB metrics",
+        "Repository batch inserts predictions",
+        "Repository queries with LIMIT/OFFSET pagination ordered by created_at DESC",
+        "Foreign key enforcement rejects invalid evaluation_id"
+      ],
+      "verificationSteps": [
+        "go test ./internal/repository -v",
+        "INSERT evaluation, verify created_at set",
+        "UPDATE status to running, verify started_at set",
+        "INSERT results with JSONB metrics, verify query works",
+        "INSERT predictions batch, verify count"
+      ],
+      "fulfills": [
+        "VAL-DB-005",
+        "VAL-DB-006",
+        "VAL-DB-007",
+        "VAL-DB-008",
+        "VAL-DB-009",
+        "VAL-DB-010",
+        "VAL-DB-011",
+        "VAL-DB-012",
+        "VAL-DB-014"
+      ],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "4038e83b-7c44-4fb7-9368-57dfce641757"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "redis-client",
+      "description": "Configure Redis client for status caching. Implement status key patterns (eval:status:{id}, eval:progress:{id}) with TTL (24h). Create helper functions for setting/getting task status from Redis.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "project-init completed"
+      ],
+      "expectedBehavior": [
+        "Redis client connects to localhost:3106",
+        "Status keys set with 24-hour TTL",
+        "GetStatus returns cached status or indicates missing",
+        "SetStatus updates status and progress",
+        "Connection pool respects max connections"
+      ],
+      "verificationSteps": [
+        "go test ./internal/cache -v",
+        "redis-cli GET eval:status:test-id returns value",
+        "redis-cli TTL eval:status:test-id returns 86400"
+      ],
+      "fulfills": [],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "7db6b117-b5f4-489e-bc6d-66d18bfe259c"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "health-endpoints",
+      "description": "Implement /health (liveness) and /ready (readiness) endpoints. Health returns 200 with minimal response. Ready checks PostgreSQL and Redis connectivity, returns 503 if any dependency unavailable with individual status.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "database-crud completed",
+        "redis-client completed"
+      ],
+      "expectedBehavior": [
+        "/health returns 200 with {status: 'healthy'}",
+        "/ready returns 200 when DB and Redis connected",
+        "/ready returns 503 when DB disconnected",
+        "/ready returns 503 when Redis disconnected",
+        "Response includes individual dependency status",
+        "Health check responds in <100ms"
+      ],
+      "verificationSteps": [
+        "curl http://localhost:3100/health",
+        "curl http://localhost:3100/ready",
+        "Stop DB, curl /ready returns 503",
+        "Stop Redis, curl /ready returns 503"
+      ],
+      "fulfills": [
+        "VAL-API-027",
+        "VAL-API-028",
+        "VAL-API-029"
+      ],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "f4c7fd96-2922-46ab-8b70-b9f251cae869"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "scrutiny-validator-infrastructure",
+      "description": "Scrutiny validation for milestone \"infrastructure\". Runs test suite, typecheck, and lint. Spawns review subagents for each completed feature. Synthesizes findings. Always returns to orchestrator.",
+      "skillName": "scrutiny-validator",
+      "preconditions": [
+        "All implementation features for milestone \"infrastructure\" are complete"
+      ],
+      "expectedBehavior": [
+        "Validators pass (test, typecheck, lint)",
+        "Review subagents spawned for each feature",
+        "Findings synthesized into scrutiny report"
+      ],
+      "verificationSteps": [],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "7f3da90a-aeaa-4b87-ba06-e7e180b28f06"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "user-testing-validator-infrastructure",
+      "description": "User testing validation for milestone \"infrastructure\". Determines testable assertions from features' fulfills field, sets up environment, spawns flow validator subagents, synthesizes results. Always returns to orchestrator.",
+      "skillName": "user-testing-validator",
+      "preconditions": [
+        "All implementation features for milestone \"infrastructure\" are complete"
+      ],
+      "expectedBehavior": [
+        "Testable assertions determined from fulfills mapping",
+        "Environment set up (services started, data seeded)",
+        "Flow validator subagents spawned and completed",
+        "Results synthesized, validation-state.json updated"
+      ],
+      "verificationSteps": [],
+      "milestone": "infrastructure",
+      "status": "completed",
+      "workerSessionIds": [
+        "a98b1fe2-c545-484f-83e3-e6dba1a585ae"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-create-evaluation",
+      "description": "Implement POST /api/v1/evaluations endpoint. Validates request (required fields: model, dataset), checks model/dataset against supported list, creates DB record with status=pending, sets Redis status, returns 202 Accepted with task_id (UUID v4) and Location header.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "health-endpoints completed"
+      ],
+      "expectedBehavior": [
+        "Valid request returns 202 with task_id",
+        "task_id is valid UUID v4 format",
+        "Missing model returns 400 with error",
+        "Missing dataset returns 400 with error",
+        "Invalid model returns 400 with valid models list",
+        "Invalid dataset returns 400 with valid datasets list",
+        "DB record created with status=pending",
+        "Redis status set to pending"
+      ],
+      "verificationSteps": [
+        "curl -X POST -H 'Content-Type: application/json' -d '{\"model\":\"gpt-4\",\"dataset\":\"mmlu\"}' http://localhost:3100/api/v1/evaluations",
+        "curl with missing model, verify 400",
+        "curl with invalid model, verify 400 with valid models",
+        "psql SELECT from evaluations verify record"
+      ],
+      "fulfills": [
+        "VAL-API-001",
+        "VAL-API-002",
+        "VAL-API-003",
+        "VAL-API-004",
+        "VAL-API-005",
+        "VAL-API-006",
+        "VAL-API-007"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "9dcf1153-8406-4596-a12c-83788bf5dcdd"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-list-evaluations",
+      "description": "Implement GET /api/v1/evaluations endpoint with pagination. Supports page and limit query parameters (default: page=1, limit=10). Returns tasks array, total count, pages calculation. Handles empty list, invalid parameters, page beyond range.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-create-evaluation completed"
+      ],
+      "expectedBehavior": [
+        "Default pagination returns page=1, limit=10",
+        "Custom ?page=2&limit=5 returns correct page",
+        "Response includes total and pages fields",
+        "Empty list returns tasks=[], total=0, pages=0",
+        "Invalid page returns 400",
+        "Invalid limit returns 400 or clamped",
+        "Page beyond range returns empty array"
+      ],
+      "verificationSteps": [
+        "curl http://localhost:3100/api/v1/evaluations",
+        "curl '?page=2&limit=5'",
+        "curl '?page=-1' verify 400",
+        "Create 20 tasks, verify pagination works"
+      ],
+      "fulfills": [
+        "VAL-API-008",
+        "VAL-API-009",
+        "VAL-API-010",
+        "VAL-API-011"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "23599dc4-4728-4c43-9108-144b969b4408"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-get-evaluation",
+      "description": "Implement GET /api/v1/evaluations/:id endpoint. Returns task details (id, model, dataset, status, config, created_at). Handles not found (404), invalid UUID format (400).",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-list-evaluations completed"
+      ],
+      "expectedBehavior": [
+        "Valid ID returns 200 with task details",
+        "Response includes id, model, dataset, status, created_at",
+        "Not found returns 404 with error",
+        "Invalid UUID format returns 400"
+      ],
+      "verificationSteps": [
+        "curl http://localhost:3100/api/v1/evaluations/{valid-id}",
+        "curl with non-existent ID, verify 404",
+        "curl with invalid UUID format, verify 400"
+      ],
+      "fulfills": [
+        "VAL-API-012",
+        "VAL-API-013"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "afd7e28c-aa96-49a2-9347-8f8263c42ab1"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-status-endpoint",
+      "description": "Implement GET /api/v1/evaluations/:id/status endpoint. Returns current status (pending/running/completed/failed/cancelled), progress (0-100). Handles not found, returns proper state for each status value.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-get-evaluation completed"
+      ],
+      "expectedBehavior": [
+        "Valid ID returns 200 with status and progress",
+        "New task shows status=pending, progress=0",
+        "Running task shows status=running, progress 1-99",
+        "Completed task shows status=completed, progress=100",
+        "Failed task shows status=failed with error field",
+        "Cancelled task shows status=cancelled with cancelled_at",
+        "Not found returns 404"
+      ],
+      "verificationSteps": [
+        "Create task, curl status verify pending",
+        "Update task to running, curl verify running",
+        "Update task to completed, curl verify completed"
+      ],
+      "fulfills": [
+        "VAL-API-014",
+        "VAL-API-015",
+        "VAL-API-016",
+        "VAL-API-017",
+        "VAL-API-018",
+        "VAL-API-019"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "92110e50-8e14-4634-8a04-b8b5b58a95c5"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-results-endpoint",
+      "description": "Implement GET /api/v1/evaluations/:id/results endpoint. Returns evaluation results (accuracy, metrics, predictions). Handles not ready (409/425 for pending/running), not found (404). Supports pagination for large prediction sets.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-status-endpoint completed",
+        "database-crud completed"
+      ],
+      "expectedBehavior": [
+        "Completed task returns 200 with results",
+        "Results include accuracy metric",
+        "Results include sample count",
+        "Pending/running task returns 409 with error",
+        "Not found returns 404",
+        "Large result set supports pagination"
+      ],
+      "verificationSteps": [
+        "curl results for completed task",
+        "curl results for pending task, verify 409",
+        "Insert predictions, curl verify pagination"
+      ],
+      "fulfills": [
+        "VAL-API-020",
+        "VAL-API-021",
+        "VAL-API-022"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "0d7cb5de-f5f6-4553-b9c7-2db21072eba8"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-cancel-endpoint",
+      "description": "Implement DELETE /api/v1/evaluations/:id endpoint. Cancels pending/running task, returns 200/204. Handles already completed (409), already cancelled (409 or idempotent), not found (404), invalid UUID (400).",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-results-endpoint completed"
+      ],
+      "expectedBehavior": [
+        "Cancel pending/running task returns 200/204",
+        "Cancelled task shows status=cancelled",
+        "Cancel completed task returns 409",
+        "Cancel already cancelled returns 409 or idempotent",
+        "Not found returns 404",
+        "Invalid UUID returns 400"
+      ],
+      "verificationSteps": [
+        "Create task, DELETE verify 200 and status=cancelled",
+        "DELETE completed task verify 409",
+        "DELETE twice verify idempotent"
+      ],
+      "fulfills": [
+        "VAL-API-023",
+        "VAL-API-024"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "c07aa2dd-22b4-429f-a3ab-9a82e68cbf79"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "api-models-datasets",
+      "description": "Implement GET /api/v1/models and GET /api/v1/datasets endpoints. Return static lists of supported models (gpt-4, claude, qwen) and datasets (MMLU, HellaSwag). Include cache headers for infrequent changes.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-cancel-endpoint completed"
+      ],
+      "expectedBehavior": [
+        "/models returns 200 with models array",
+        "/datasets returns 200 with datasets array",
+        "Each model has id and name fields",
+        "Each dataset has id, name, description",
+        "Response includes cache headers"
+      ],
+      "verificationSteps": [
+        "curl /api/v1/models",
+        "curl /api/v1/datasets",
+        "Verify cache headers present"
+      ],
+      "fulfills": [
+        "VAL-API-025",
+        "VAL-API-026"
+      ],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "127850ec-323f-42d7-97ea-ad521f53c744"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "scrutiny-validator-api",
+      "description": "Scrutiny validation for milestone \"api\". Runs test suite, typecheck, and lint. Spawns review subagents for each completed feature. Synthesizes findings. Always returns to orchestrator.",
+      "skillName": "scrutiny-validator",
+      "preconditions": [
+        "All implementation features for milestone \"api\" are complete"
+      ],
+      "expectedBehavior": [
+        "Validators pass (test, typecheck, lint)",
+        "Review subagents spawned for each feature",
+        "Findings synthesized into scrutiny report"
+      ],
+      "verificationSteps": [],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "1093b2e0-d6e6-404a-888a-d98acb3c8d91"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-progress-completed",
+      "description": "Fix VAL-API-017 bug: The /api/v1/evaluations/:id/status endpoint returns progress=0 for completed evaluations instead of progress=100. The status handler should set progress to 100 when status is 'completed'. Check GetEvaluationStatus handler in internal/handler/evaluation_handler.go and ensure progress is computed correctly based on status.",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Completed evaluations return progress=100 in status response",
+        "Tests verify progress=100 for completed status"
+      ],
+      "verificationSteps": [
+        "curl http://localhost:3100/api/v1/evaluations/{completed-id}/status returns progress=100",
+        "go test ./internal/handler -run TestGetEvaluationStatus -v"
+      ],
+      "fulfills": [],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "42093792-f9b0-4f95-9ba1-5721c43cdf8b"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "user-testing-validator-api",
+      "description": "User testing validation for milestone \"api\". Determines testable assertions from features' fulfills field, sets up environment, spawns flow validator subagents, synthesizes results. Always returns to orchestrator.",
+      "skillName": "user-testing-validator",
+      "preconditions": [
+        "All implementation features for milestone \"api\" are complete"
+      ],
+      "expectedBehavior": [
+        "Testable assertions determined from fulfills mapping",
+        "Environment set up (services started, data seeded)",
+        "Flow validator subagents spawned and completed",
+        "Results synthesized, validation-state.json updated"
+      ],
+      "verificationSteps": [],
+      "milestone": "api",
+      "status": "completed",
+      "workerSessionIds": [
+        "8d737683-2443-4814-84a7-33d228a7ba1b",
+        "d232e6b4-e29f-4817-800e-0cc66071e320",
+        "559e7e14-7db4-4176-b2c1-8301f2f4ba78",
+        "1f8ffc03-746d-47a6-9001-1367704b86f7"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "k8s-client-setup",
+      "description": "Use kind crete new cluster and Configure Kubernetes client-go for Job management. Create client configuration from in-cluster or kubeconfig. Implement namespace targeting (llm-eval), label selector helpers, owner reference setup.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "api-models-datasets completed"
+      ],
+      "expectedBehavior": [
+        "K8s client connects to cluster",
+        "Client targets llm-eval namespace",
+        "Label helpers construct correct label sets",
+        "Owner references link Jobs to evaluation ID"
+      ],
+      "verificationSteps": [
+        "go test ./internal/k8s -v",
+        "kubectl get ns llm-eval (or create)",
+        "Verify client can list jobs"
+      ],
+      "fulfills": [],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "d299b44d-4ce1-4061-83d7-cf7619f4336c"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "k8s-configmap-generator",
+      "description": "Implement ConfigMap generator for OpenCompass configuration. Generate valid MMEngine Python config file with model config, dataset config, inferencer settings. Include proper labels matching Job.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "k8s-client-setup completed"
+      ],
+      "expectedBehavior": [
+        "Generated config is valid Python syntax",
+        "Config includes model config with type, path, max_seq_len",
+        "Config includes dataset config with correct inferencer",
+        "ConfigMap created with correct labels",
+        "ConfigMap data field contains config.py"
+      ],
+      "verificationSteps": [
+        "go test ./internal/k8s/configmap -v",
+        "Generate config, verify Python syntax",
+        "kubectl get configmap -n llm-eval verify creation"
+      ],
+      "fulfills": [
+        "VAL-K8S-009",
+        "VAL-K8S-010"
+      ],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "15560868-583a-431c-a194-33a7b8dca772"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "k8s-secret-manager",
+      "description": "Implement Secret manager for API keys. Create Secret with base64 encoded keys (OpenAI, Claude, Qwen). Mount as volume in Job spec. Ensure keys not exposed in logs.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "k8s-configmap-generator completed"
+      ],
+      "expectedBehavior": [
+        "Secret created with base64 encoded keys",
+        "Secret has owner reference to Job",
+        "Secret mounted as volume in Job spec",
+        "Keys not visible in pod logs"
+      ],
+      "verificationSteps": [
+        "go test ./internal/k8s/secret -v",
+        "kubectl get secret -n llm-eval verify creation",
+        "kubectl logs verify no key exposure"
+      ],
+      "fulfills": [
+        "VAL-K8S-011",
+        "VAL-K8S-012"
+      ],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "ff12f611-4713-4725-8348-d04c03d4c875"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "k8s-job-creator",
+      "description": "Implement Job creator for evaluation execution. Create Job spec with correct container image, resource limits (500m CPU, 512Mi memory), ConfigMap volume mount, Secret volume mount, RestartPolicy=OnFailure, backoffLimit=3, activeDeadlineSeconds=7200.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "k8s-secret-manager completed"
+      ],
+      "expectedBehavior": [
+        "Job created in llm-eval namespace",
+        "Job has labels: app=llm-eval, eval-id={id}, model={name}",
+        "Job uses correct container image",
+        "Job has resource requests/limits",
+        "Job mounts ConfigMap and Secret",
+        "RestartPolicy is OnFailure or Never",
+        "Backoff limit is 3",
+        "Active deadline is 7200s (2h)"
+      ],
+      "verificationSteps": [
+        "go test ./internal/k8s/job -v",
+        "kubectl get job -n llm-eval -o yaml verify spec",
+        "Verify labels, resources, volumes"
+      ],
+      "fulfills": [
+        "VAL-K8S-001",
+        "VAL-K8S-002",
+        "VAL-K8S-003",
+        "VAL-K8S-004",
+        "VAL-K8S-005",
+        "VAL-K8S-006",
+        "VAL-K8S-007",
+        "VAL-K8S-008"
+      ],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "fc63a157-6569-4fa9-bfc3-eb8088a24ab9"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "k8s-status-monitor",
+      "description": "Implement Job status monitor. Poll Job status via client-go, detect Running/Completed/Failed states. Capture Job events. Update DB and Redis when status changes. Detect OOM killed pods.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "k8s-job-creator completed"
+      ],
+      "expectedBehavior": [
+        "Monitor detects Job running state",
+        "Monitor detects Job completed state",
+        "Monitor detects Job failed state",
+        "Events captured and stored",
+        "API status reflects real Job state",
+        "OOM killed pods detected"
+      ],
+      "verificationSteps": [
+        "Create Job, monitor verify running",
+        "Wait for completion, monitor verify completed",
+        "Simulate failure, monitor verify failed"
+      ],
+      "fulfills": [
+        "VAL-K8S-013",
+        "VAL-K8S-014",
+        "VAL-K8S-015",
+        "VAL-K8S-016",
+        "VAL-K8S-017"
+      ],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "71450420-5350-454b-91f1-a10d5914883c"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "scrutiny-validator-k8s-integration",
+      "description": "Scrutiny validation for milestone \"k8s-integration\". Runs test suite, typecheck, and lint. Spawns review subagents for each completed feature. Synthesizes findings. Always returns to orchestrator.",
+      "skillName": "scrutiny-validator",
+      "preconditions": [
+        "All implementation features for milestone \"k8s-integration\" are complete"
+      ],
+      "expectedBehavior": [
+        "Validators pass (test, typecheck, lint)",
+        "Review subagents spawned for each feature",
+        "Findings synthesized into scrutiny report"
+      ],
+      "verificationSteps": [],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "86cfcd02-cb22-4e0d-8d51-413ae17298d0"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "user-testing-validator-k8s-integration",
+      "description": "User testing validation for milestone \"k8s-integration\". Determines testable assertions from features' fulfills field, sets up environment, spawns flow validator subagents, synthesizes results. Always returns to orchestrator.",
+      "skillName": "user-testing-validator",
+      "preconditions": [
+        "All implementation features for milestone \"k8s-integration\" are complete"
+      ],
+      "expectedBehavior": [
+        "Testable assertions determined from fulfills mapping",
+        "Environment set up (services started, data seeded)",
+        "Flow validator subagents spawned and completed",
+        "Results synthesized, validation-state.json updated"
+      ],
+      "verificationSteps": [],
+      "milestone": "k8s-integration",
+      "status": "completed",
+      "workerSessionIds": [
+        "4e5ecf5f-a905-4497-9676-5eae3c21c10c",
+        "abf469d7-eced-4826-99fd-87628a87d267"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "opencompass-config",
+      "description": "Implement OpenCompass config generator for API models. Generate MMEngine config for OpenAI (type=OpenAI, path=gpt-4, key from env), Claude (key from env), Qwen (DashScope API). Include dataset configs (MMLU, HellaSwag) with correct inferencer.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "k8s-configmap-generator completed"
+      ],
+      "expectedBehavior": [
+        "OpenAI config has type=OpenAI, path=gpt-4, num_gpus=0",
+        "Claude config has correct type, key from env",
+        "Qwen config uses DashScope, key from env",
+        "MMLU config has PPLInferencer",
+        "HellaSwag config has correct inferencer",
+        "API keys injected via env vars only"
+      ],
+      "verificationSteps": [
+        "go test ./internal/evaluator/config -v",
+        "Generate OpenAI config, verify structure",
+        "Generate Claude config, verify structure",
+        "Verify no keys in config file (only env var refs)"
+      ],
+      "fulfills": [
+        "VAL-OC-004",
+        "VAL-OC-005",
+        "VAL-OC-006",
+        "VAL-OC-007",
+        "VAL-OC-008"
+      ],
+      "milestone": "opencompass",
+      "status": "completed",
+      "workerSessionIds": [
+        "e7922448-0c23-48d5-baa2-fa74a805621b"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "opencompass-cli-wrapper",
+      "description": "Implement CLI subprocess wrapper for OpenCompass execution. Construct command with required args, inject env vars for API keys, execute with timeout, capture stdout/stderr. Handle non-zero exit codes, timeouts, errors.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "opencompass-config completed"
+      ],
+      "expectedBehavior": [
+        "CLI command constructed with --datasets, --work-dir",
+        "API keys injected via environment variables",
+        "Timeout enforced (configurable)",
+        "stdout and stderr captured",
+        "Non-zero exit code captured",
+        "Error handling returns structured error"
+      ],
+      "verificationSteps": [
+        "go test ./internal/evaluator/cli -v",
+        "Execute mock evaluation, verify output capture",
+        "Test timeout scenario",
+        "Test error scenario"
+      ],
+      "fulfills": [
+        "VAL-OC-001",
+        "VAL-OC-002",
+        "VAL-OC-003"
+      ],
+      "milestone": "opencompass",
+      "status": "completed",
+      "workerSessionIds": [
+        "3d14ad86-b324-4a7d-b458-1f280a0edb2e"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "opencompass-results-parser",
+      "description": "Implement results parser for OpenCompass output. Parse JSON predictions (question, prediction, answer), extract CSV summary (accuracy scores). Handle missing output directory, malformed files. Manage timestamp-based output directories.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "opencompass-cli-wrapper completed"
+      ],
+      "expectedBehavior": [
+        "JSON predictions parsed correctly",
+        "CSV summary extracted with scores",
+        "Output directory validated",
+        "Timestamp-based naming works",
+        "Cleanup after successful collection",
+        "Malformed files handled gracefully"
+      ],
+      "verificationSteps": [
+        "go test ./internal/evaluator/parser -v",
+        "Parse sample output, verify predictions",
+        "Parse CSV, verify scores",
+        "Test malformed input handling"
+      ],
+      "fulfills": [
+        "VAL-OC-009",
+        "VAL-OC-010",
+        "VAL-OC-011",
+        "VAL-OC-012",
+        "VAL-OC-013"
+      ],
+      "milestone": "opencompass",
+      "status": "completed",
+      "workerSessionIds": [
+        "f94c9c86-e952-4119-a917-056603621988"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "scrutiny-validator-opencompass",
+      "description": "Scrutiny validation for milestone \"opencompass\". Runs test suite, typecheck, and lint. Spawns review subagents for each completed feature. Synthesizes findings. Always returns to orchestrator.",
+      "skillName": "scrutiny-validator",
+      "preconditions": [
+        "All implementation features for milestone \"opencompass\" are complete"
+      ],
+      "expectedBehavior": [
+        "Validators pass (test, typecheck, lint)",
+        "Review subagents spawned for each feature",
+        "Findings synthesized into scrutiny report"
+      ],
+      "verificationSteps": [],
+      "milestone": "opencompass",
+      "status": "completed",
+      "workerSessionIds": [
+        "608a91ba-44e8-454d-be30-800cc5f4f511"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "user-testing-validator-opencompass",
+      "description": "User testing validation for milestone \"opencompass\". Determines testable assertions from features' fulfills field, sets up environment, spawns flow validator subagents, synthesizes results. Always returns to orchestrator.",
+      "skillName": "user-testing-validator",
+      "preconditions": [
+        "All implementation features for milestone \"opencompass\" are complete"
+      ],
+      "expectedBehavior": [
+        "Testable assertions determined from fulfills mapping",
+        "Environment set up (services started, data seeded)",
+        "Flow validator subagents spawned and completed",
+        "Results synthesized, validation-state.json updated"
+      ],
+      "verificationSteps": [],
+      "milestone": "opencompass",
+      "status": "completed",
+      "workerSessionIds": [
+        "7d702544-6052-47e6-b0f3-6fa852c67503"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "evaluation-orchestrator",
+      "description": "Implement evaluation orchestrator that ties together Job creation, OpenCompass execution, and result collection. Create Job when evaluation starts, monitor progress, collect results on completion, store in DB, update status throughout.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "opencompass-results-parser completed",
+        "k8s-status-monitor completed"
+      ],
+      "expectedBehavior": [
+        "Job created when evaluation triggered",
+        "Progress updated during execution",
+        "Results collected and stored on completion",
+        "Errors captured and stored on failure",
+        "Cleanup after completion"
+      ],
+      "verificationSteps": [
+        "Create evaluation via API",
+        "Verify Job created",
+        "Wait for completion",
+        "Verify results in DB"
+      ],
+      "fulfills": [
+        "VAL-CROSS-001",
+        "VAL-CROSS-002",
+        "VAL-CROSS-003"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "f0f8b7c4-1b77-4f1e-b1b2-001aae0820f6"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "cancellation-handler",
+      "description": "Implement cancellation handler. Delete K8s Job on cancellation, update DB status to cancelled, preserve partial results. Handle orphaned Job detection and cleanup.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "evaluation-orchestrator completed"
+      ],
+      "expectedBehavior": [
+        "DELETE cancels running Job",
+        "Job terminated via kubectl delete",
+        "DB status updated to cancelled",
+        "Partial results preserved",
+        "Orphaned Jobs detected and cleaned"
+      ],
+      "verificationSteps": [
+        "Create running evaluation, DELETE it",
+        "Verify Job deleted",
+        "Verify DB shows cancelled",
+        "Verify partial results if any"
+      ],
+      "fulfills": [
+        "VAL-CROSS-004"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "1ab8e5de-c8c5-448c-a615-49558105dcef"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "error-propagation",
+      "description": "Implement error propagation across surfaces. Capture OpenCompass stderr, store in DB logs table, return via API status endpoint. Handle K8s Job creation errors, DB failures, Redis failures gracefully.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "cancellation-handler completed"
+      ],
+      "expectedBehavior": [
+        "OpenCompass failure stored in DB",
+        "API returns failed status with error",
+        "K8s Job creation errors handled",
+        "DB failures don't crash system",
+        "Redis failures fall back to K8s polling"
+      ],
+      "verificationSteps": [
+        "Simulate OpenCompass failure",
+        "Verify error in DB",
+        "Verify API returns error",
+        "Test DB unavailable scenario"
+      ],
+      "fulfills": [
+        "VAL-CROSS-005"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "3cd490b9-469a-4275-b75e-f245bd9c74bc"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "concurrency-handling",
+      "description": "Implement concurrency handling for parallel evaluations. Ensure isolated Jobs, isolated DB records, isolated results. Handle race conditions on duplicate creation, status update conflicts. Support 10+ concurrent tasks.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "error-propagation completed"
+      ],
+      "expectedBehavior": [
+        "5+ evaluations run without interference",
+        "Jobs isolated with unique names",
+        "DB records isolated",
+        "No cross-contamination of predictions",
+        "Race conditions handled correctly"
+      ],
+      "verificationSteps": [
+        "Create 5 evaluations concurrently",
+        "Verify 5 distinct Jobs",
+        "Verify 5 distinct DB records",
+        "Verify results isolated"
+      ],
+      "fulfills": [
+        "VAL-CROSS-007",
+        "VAL-CROSS-009"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "728f224a-c02e-4339-8ade-0463f9ff8fa2"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "result-pagination",
+      "description": "Implement efficient pagination for large result sets (10,000+ predictions). Use DB OFFSET/LIMIT with index. Return correct total, pages. Verify query efficiency with EXPLAIN ANALYZE.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "concurrency-handling completed"
+      ],
+      "expectedBehavior": [
+        "Page=1 returns first 100 items",
+        "Page=2 returns next 100 items",
+        "Total count accurate",
+        "Pages calculation correct",
+        "DB query uses index efficiently"
+      ],
+      "verificationSteps": [
+        "Insert 10,000 predictions",
+        "curl results?page=1&limit=100",
+        "curl results?page=100",
+        "EXPLAIN ANALYZE verify index"
+      ],
+      "fulfills": [
+        "VAL-CROSS-008"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "085937c2-6b71-45cb-9bec-d53d111e0a4e"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "secret-security",
+      "description": "Verify API key security throughout the system. Keys in K8s Secrets only, not in DB, not in API responses, not in logs. Verify secure mounting in Job pods.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "result-pagination completed"
+      ],
+      "expectedBehavior": [
+        "Keys only in K8s Secrets",
+        "Keys not in DB records",
+        "Keys not in API responses",
+        "Keys not in pod logs",
+        "Keys securely mounted"
+      ],
+      "verificationSteps": [
+        "kubectl logs grep for key",
+        "curl API verify no key",
+        "psql query verify no key",
+        "kubectl exec verify env"
+      ],
+      "fulfills": [
+        "VAL-CROSS-006"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "da0f44eb-f4bf-42b4-b01a-38af42346088"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "high-load-test",
+      "description": "Test high concurrency load (20 evaluations within 1 second). Verify all accepted, 20 Jobs created, all complete successfully. Measure performance, identify bottlenecks.",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "secret-security completed"
+      ],
+      "expectedBehavior": [
+        "20 concurrent requests all return 202",
+        "20 Jobs created",
+        "All 20 complete successfully",
+        "No resource starvation",
+        "Performance within acceptable limits"
+      ],
+      "verificationSteps": [
+        "Use shell to create 20 tasks in parallel",
+        "kubectl get jobs verify 20",
+        "Wait and verify all completed"
+      ],
+      "fulfills": [
+        "VAL-CROSS-010"
+      ],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "91f70285-8689-46b9-899e-1869508d5b15"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-error-propagation",
+      "description": "Fix error-propagation blocking issues: (1) Wire up markFailedWithStderr in orchestrator to connect CLI execution results with stderr capture, (2) Store stderr parameter in InMemoryEventStore.StoreError instead of discarding it",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "markFailedWithStderr called when CLI execution fails",
+        "stderr stored in EventStore instead of discarded",
+        "Tests verify stderr capture flow works end-to-end"
+      ],
+      "verificationSteps": [
+        "go test ./internal/service/... -run TestErrorPropagation -v",
+        "go test ./internal/k8s/monitor/... -run TestStoreError -v"
+      ],
+      "fulfills": [],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "f4445eb8-cc78-4c1e-ac04-7e9164d2fdca"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-result-pagination",
+      "description": "Fix result-pagination blocking issues: (1) Run EXPLAIN ANALYZE on pagination query to verify indexes are used correctly, (2) Add test case with 10,000+ predictions to verify large OFFSET pagination performance",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "EXPLAIN ANALYZE shows index scan on predictions table",
+        "Test with 10,000+ predictions passes",
+        "Pagination returns correct pages for large result sets"
+      ],
+      "verificationSteps": [
+        "psql -c 'EXPLAIN ANALYZE SELECT * FROM predictions WHERE evaluation_id=$1 ORDER BY question_index LIMIT 100 OFFSET 9900'",
+        "go test ./internal/repository/... -run TestPagination -v"
+      ],
+      "fulfills": [],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "68633fe2-33d2-4806-ae22-72f2250de611"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "scrutiny-validator-end-to-end",
+      "description": "Scrutiny validation for milestone \"end-to-end\". Runs test suite, typecheck, and lint. Spawns review subagents for each completed feature. Synthesizes findings. Always returns to orchestrator.",
+      "skillName": "scrutiny-validator",
+      "preconditions": [
+        "All implementation features for milestone \"end-to-end\" are complete"
+      ],
+      "expectedBehavior": [
+        "Validators pass (test, typecheck, lint)",
+        "Review subagents spawned for each feature",
+        "Findings synthesized into scrutiny report"
+      ],
+      "verificationSteps": [],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "698562d1-a415-4b8b-b2a2-065c5b5855df",
+        "47e902e0-4fbd-41e1-964f-f0ffda5fd07b"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-k8s-job-creation",
+      "description": "Fix K8s Job creation not working: evaluations stay pending, Jobs not being created in llm-eval namespace. Check StartEvaluation goroutine in evaluation handler - it may be failing silently or not being triggered. Verify orchestrator.StartEvaluation is being called and K8s client is properly configured.",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "POST /api/v1/evaluations creates K8s Job in llm-eval namespace",
+        "Evaluation status transitions from pending to running",
+        "kubectl get jobs -n llm-eval shows created Jobs"
+      ],
+      "verificationSteps": [
+        "curl -X POST http://localhost:3100/api/v1/evaluations -d '{\"model\":\"gpt-4\",\"dataset\":\"mmlu\"}'",
+        "kubectl get jobs -n llm-eval",
+        "Verify Job exists with correct labels"
+      ],
+      "fulfills": [],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "5bfed4a7-c453-4e8a-84d6-3396d2015707"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "user-testing-validator-end-to-end",
+      "description": "User testing validation for milestone \"end-to-end\". Determines testable assertions from features' fulfills field, sets up environment, spawns flow validator subagents, synthesizes results. Always returns to orchestrator.",
+      "skillName": "user-testing-validator",
+      "preconditions": [
+        "All implementation features for milestone \"end-to-end\" are complete"
+      ],
+      "expectedBehavior": [
+        "Testable assertions determined from fulfills mapping",
+        "Environment set up (services started, data seeded)",
+        "Flow validator subagents spawned and completed",
+        "Results synthesized, validation-state.json updated"
+      ],
+      "verificationSteps": [],
+      "milestone": "end-to-end",
+      "status": "completed",
+      "workerSessionIds": [
+        "8c354d22-b204-4c5c-8cf4-970c11011b81",
+        "3811eb74-8dc8-4515-a6e7-62df122868f2"
+      ],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    }
+  ]
+}

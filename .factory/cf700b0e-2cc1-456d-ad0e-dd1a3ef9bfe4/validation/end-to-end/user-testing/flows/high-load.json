@@ -1,0 +1,89 @@
+{
+  "groupId": "high-load",
+  "testedAt": "2026-05-10T21:51:19+08:00",
+  "isolation": {
+    "api": "http://localhost:3100",
+    "postgres": "localhost:3105",
+    "redis": "localhost:3106",
+    "k8sNamespace": "llm-eval"
+  },
+  "toolsUsed": ["curl", "kubectl", "psql"],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-010",
+      "title": "High Concurrency Load Handling - 20 concurrent evaluations",
+      "status": "fail",
+      "criteria": "20 concurrent evaluations created within 1 second, all accepted (202), 20 K8s Jobs created, all complete successfully",
+      "steps": [
+        {
+          "action": "Create 20 concurrent evaluation POST requests",
+          "expected": "All 20 return HTTP 202 within 1 second",
+          "observed": "All 20 returned HTTP 202 in ~0.14 seconds"
+        },
+        {
+          "action": "Verify K8s Jobs created",
+          "expected": "20 Jobs created in llm-eval namespace",
+          "observed": "0 Jobs found in llm-eval namespace"
+        },
+        {
+          "action": "Verify evaluations in database",
+          "expected": "20 new evaluations recorded",
+          "observed": "71 total evaluations in DB (20 new)"
+        },
+        {
+          "action": "Verify Jobs complete successfully",
+          "expected": "All 20 Jobs complete successfully",
+          "observed": "BLOCKED - No Jobs created to monitor"
+        }
+      ],
+      "evidence": {
+        "apiResponses": [
+          "All 20 requests returned HTTP 202 Accepted",
+          "Response body: {\"task_id\":\"<uuid>\",\"status\":\"pending\",\"model\":\"gpt-4\",\"dataset\":\"mmlu\"}",
+          "Time to create all 20: ~0.14 seconds (< 1 second requirement)"
+        ],
+        "kubectlOutput": "No resources found in llm-eval namespace",
+        "databaseQuery": "71 total evaluations (50 prior + 21 new including one test run)",
+        "newEvaluationIds": [
+          "2866c0b7-79d6-4cb0-b82d-af8974e9d7ae",
+          "d6d03fb4-31d0-482f-b7b3-b4ab1534a98e",
+          "8c32e896-ff66-4a0a-a0db-2fee8294d312",
+          "555b0259-7357-46c7-984d-db92b8b60046",
+          "7833bdbb-e90a-4d31-a502-ccdaa2159a75",
+          "3910d3f9-aa5a-48d7-8c2c-48cd6ec3274a",
+          "4c691083-9e4f-48fd-9cab-100b61071233",
+          "c62f17a7-73eb-400c-891f-16d6418fd6a8",
+          "764aed4f-5dae-45b6-b18f-1ce7af92d3ed",
+          "7573670e-a6d2-44f3-9810-643b45932240",
+          "33169915-393c-473b-89c7-a06d5dc42141",
+          "cc31aa52-ad04-4453-9063-df6d2a7f0d98",
+          "4e09ae31-ab14-4208-9e9e-0003ea430d5a",
+          "8d29782b-a35e-4cf5-a602-65a60677d3c4",
+          "ed8b240d-6433-4a4c-be8c-0f4975412493",
+          "c24a7ff1-0748-41b0-95ab-c56d7c2f243a",
+          "05c0c4b9-6821-4fab-9329-0b8970e1179a",
+          "cd1c244b-0ee0-4c61-8d46-6ab49eb4b3ac",
+          "ce5ba18f-4ae6-48e2-b40d-bc7488ad4349",
+          "d369403b-b155-4f2c-a3fd-0656847a8273"
+        ]
+      },
+      "issues": "K8s Jobs are not being created for evaluations. The API accepts requests and creates DB records, but no Kubernetes Jobs are spawned in the llm-eval namespace. This suggests either: (1) the Job creation logic is not triggered, (2) the K8s client is not properly configured, or (3) there's an async worker that hasn't processed the evaluations."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "All evaluations stuck in 'pending' status - K8s Jobs not being created despite K8s namespace existing",
+      "resolved": false,
+      "resolution": "Investigated but could not resolve - Jobs not appearing even after 20+ evaluations created",
+      "affectedAssertions": ["VAL-CROSS-010"]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "No K8s Jobs are being created for evaluations. Cannot verify '20 Jobs complete successfully' requirement because no Jobs exist to complete.",
+      "affectedAssertions": ["VAL-CROSS-010"],
+      "quickFixAttempted": "Verified llm-eval namespace exists, kubectl accessible, API healthy. Jobs still not appearing."
+    }
+  ],
+  "summary": "Tested VAL-CROSS-010: 20 concurrent evaluations created and all returned HTTP 202 within 0.14 seconds (PASS for acceptance criteria). However, 0 K8s Jobs were created in the llm-eval namespace (FAIL for Job creation). Evaluations are recorded in DB with 'pending' status but never transition to 'running' or create K8s Jobs. Cannot verify Job completion because no Jobs were created."
+}

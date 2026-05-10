@@ -1,0 +1,8 @@
+{
+  "workerModel": "custom:Minimax-2.7-[Minimax]-0",
+  "workerReasoningEffort": "none",
+  "validationWorkerModel": "custom:Minimax-2.7-[Minimax]-0",
+  "validationWorkerReasoningEffort": "none",
+  "skipScrutiny": false,
+  "skipUserTesting": false
+}

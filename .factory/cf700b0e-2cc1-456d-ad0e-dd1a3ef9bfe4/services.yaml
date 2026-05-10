@@ -1,0 +1,29 @@
+commands:
+  install: go mod download && go mod tidy
+  build: go build -o bin/api ./cmd/api
+  test: go test ./... -v -cover
+  lint: go vet ./... && go fmt ./...
+  typecheck: go build ./...
+  run: PORT=3100 ./bin/api
+
+services:
+  postgres:
+    start: docker run -d --name eval-postgres -e POSTGRES_USER=eval_user -e POSTGRES_PASSWORD=eval_pass -e POSTGRES_DB=evaluations -p 3105:5432 postgres:17-alpine
+    stop: docker stop eval-postgres && docker rm eval-postgres
+    healthcheck: pg_isready -h localhost -p 3105 -U eval_user -d evaluations
+    port: 3105
+    depends_on: []
+
+  redis:
+    start: docker run -d --name eval-redis -p 3106:6379 redis:7-alpine
+    stop: docker stop eval-redis && docker rm eval-redis
+    healthcheck: redis-cli -p 3106 ping
+    port: 3106
+    depends_on: []
+
+  api:
+    start: PORT=3100 DB_HOST=localhost DB_PORT=3105 REDIS_HOST=localhost REDIS_PORT=3106 ./bin/api
+    stop: lsof -ti :3100 | xargs kill -9 2>/dev/null || true
+    healthcheck: curl -sf http://localhost:3100/health
+    port: 3100
+    depends_on: [postgres, redis]

@@ -1,0 +1,2 @@
+{"id":"09e5dafd-8279-4286-afb8-4a009f011648","status":"cancelled","progress":0,"cancelled_at":"2026-05-10T16:45:29+08:00"}
+HTTP_CODE:200

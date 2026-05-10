@@ -1,0 +1,23 @@
+VAL-API-022: Results Include Accuracy Metric
+Evaluation results include overall accuracy score as a percentage or decimal.
+
+=== TEST: GET /api/v1/evaluations/8bb55603-42f1-4056-b073-6f805fcd5114/results ===
+
+Response contains:
+{
+  "results":[
+    {
+      "dataset_id":"6e9e9bcc-3d57-41af-97da-c975d5ab853d",
+      "dataset_name":"mmlu",
+      "accuracy":0.85,
+      "sample_count":0,
+      "metrics":{"f1":0.82,"precision":0.88},
+      "summary":"Test evaluation"
+    }
+  ]
+}
+
+Result: PASS
+- Response contains accuracy field with value 0.85
+- Accuracy is in decimal format (0-1 range)
+- Results also include additional metrics (f1, precision) in metrics object

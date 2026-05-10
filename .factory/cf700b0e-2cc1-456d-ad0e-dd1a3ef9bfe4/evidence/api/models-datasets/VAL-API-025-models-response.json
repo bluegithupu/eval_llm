@@ -1,0 +1,1 @@
+{"models":[{"id":"gpt-4","name":"GPT-4","provider":"openai"},{"id":"claude","name":"Claude","provider":"anthropic"},{"id":"qwen","name":"Qwen","provider":"dashscope"}]}

@@ -1,0 +1,27 @@
+VAL-DB-003: Results Table Schema
+=================================
+SQL: \d results
+
+Output:
+                                Table "public.results"
+    Column     |           Type           | Collation | Nullable |      Default       
+---------------+--------------------------+-----------+----------+--------------------
+ id            | uuid                     |           | not null | uuid_generate_v4()
+ evaluation_id | uuid                     |           | not null | 
+ dataset_id    | uuid                     |           | not null | 
+ accuracy      | numeric(5,4)             |           | not null | 
+ sample_count  | integer                  |           | not null | 0
+ correct_count | integer                  |           | not null | 0
+ metrics       | jsonb                    |           |          | '{}'::jsonb
+ summary       | text                     |           |          | 
+ created_at    | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "results_pkey" PRIMARY KEY, btree (id)
+    "results_evaluation_id_dataset_id_key" UNIQUE CONSTRAINT, btree (evaluation_id, dataset_id)
+Check constraints:
+    "results_accuracy_check" CHECK (accuracy >= 0::numeric AND accuracy <= 1::numeric)
+Foreign-key constraints:
+    "results_dataset_id_fkey" FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE RESTRICT
+    "results_evaluation_id_fkey" FOREIGN KEY (evaluation_id) REFERENCES evaluations(id) ON DELETE CASCADE
+
+RESULT: PASS - Columns present, evaluation_id foreign key references evaluations(id) ON DELETE CASCADE.

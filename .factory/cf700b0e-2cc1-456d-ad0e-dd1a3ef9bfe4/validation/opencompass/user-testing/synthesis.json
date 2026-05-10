@@ -1,0 +1,30 @@
+{
+  "milestone": "opencompass",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-OC-001",
+    "VAL-OC-002",
+    "VAL-OC-003",
+    "VAL-OC-004",
+    "VAL-OC-005",
+    "VAL-OC-006",
+    "VAL-OC-007",
+    "VAL-OC-008",
+    "VAL-OC-009",
+    "VAL-OC-010",
+    "VAL-OC-011",
+    "VAL-OC-012",
+    "VAL-OC-013"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}
