@@ -26,11 +26,11 @@ type CLIWrapper struct {
 
 // CLIResult holds the result of CLI execution
 type CLIResult struct {
-	ExitCode int           // Exit code (0 for success, -1 for timeout)
-	Stdout   string        // Standard output
-	Stderr   string        // Standard error
-	Error    error         // Error if any
-	Timeout  bool          // True if execution timed out
+	ExitCode int    // Exit code (0 for success, -1 for timeout)
+	Stdout   string // Standard output
+	Stderr   string // Standard error
+	Error    error  // Error if any
+	Timeout  bool   // True if execution timed out
 }
 
 // CLIError represents a CLI execution error
@@ -168,8 +168,8 @@ func (w *CLIWrapper) Execute(ctx context.Context, cmd *Command) *CLIResult {
 			// Context cancelled
 			result.ExitCode = -1
 			result.Error = &CLIError{
-				ExitCode: -1,
-				Stderr:   result.Stderr,
+				ExitCode:  -1,
+				Stderr:    result.Stderr,
 				Cancelled: true,
 			}
 		} else {
@@ -197,10 +197,10 @@ func (w *CLIWrapper) Execute(ctx context.Context, cmd *Command) *CLIResult {
 
 // Command holds the configuration for executing a command
 type Command struct {
-	Path    string      // Executable path
-	Args    []string   // Command arguments
-	Env     []string   // Environment variables
-	Dir     string     // Working directory
+	Path    string        // Executable path
+	Args    []string      // Command arguments
+	Env     []string      // Environment variables
+	Dir     string        // Working directory
 	Timeout time.Duration // Timeout for this specific command
 	Stdout  *bytes.Buffer // Captured stdout
 	Stderr  *bytes.Buffer // Captured stderr

@@ -275,9 +275,9 @@ func TestCLIWrapper_SetEnvVars(t *testing.T) {
 
 	// Test setting environment variables
 	envVars := map[string]string{
-		"OPENAI_API_KEY":     "sk-12345",
-		"ANTHROPIC_API_KEY":  "sk-ant-67890",
-		"DASHSCOPE_API_KEY":  "sk-ds-abcde",
+		"OPENAI_API_KEY":    "sk-12345",
+		"ANTHROPIC_API_KEY": "sk-ant-67890",
+		"DASHSCOPE_API_KEY": "sk-ds-abcde",
 	}
 
 	wrapper.SetEnvVars(envVars)
@@ -356,8 +356,8 @@ func TestCLIWrapper_ClearEnvVars(t *testing.T) {
 
 func TestCLIWrapper_GetEnvVars(t *testing.T) {
 	envVars := map[string]string{
-		"OPENAI_API_KEY":    "sk-12345",
-		"CUSTOM_VAR":        "custom-value",
+		"OPENAI_API_KEY": "sk-12345",
+		"CUSTOM_VAR":     "custom-value",
 	}
 
 	wrapper := NewCLIWrapper(CLIConfig{
@@ -397,9 +397,9 @@ func TestCLIError_Error_WithTimeout(t *testing.T) {
 
 func TestCLIError_Error_WithContextCancel(t *testing.T) {
 	err := &CLIError{
-		ExitCode: -1,
-		Stderr:   "context canceled",
-		Timeout:  false,
+		ExitCode:  -1,
+		Stderr:    "context canceled",
+		Timeout:   false,
 		Cancelled: true,
 	}
 
