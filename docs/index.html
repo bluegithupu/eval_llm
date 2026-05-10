@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Evaluation Backend - 云原生评测系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            color: #a1a1aa;
+            font-size: 1.1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+
+        .badge-go { background: #00add8; color: white; }
+        .badge-k8s { background: #326ce5; color: white; }
+        .badge-api { background: #ff6b6b; color: white; }
+        .badge-db { background: #336791; color: white; }
+
+        section {
+            margin-bottom: 3rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: #60a5fa;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #60a5fa;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .architecture-diagram {
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow-x: auto;
+        }
+
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            min-width: 800px;
+        }
+
+        .flow-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .component {
+            background: linear-gradient(135deg, rgba(96,165,250,0.2), rgba(167,139,250,0.2));
+            border: 1px solid rgba(96,165,250,0.3);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            min-width: 140px;
+            transition: all 0.3s ease;
+        }
+
+        .component:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(96,165,250,0.2);
+        }
+
+        .component-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .component-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .component-desc {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-top: 0.25rem;
+        }
+
+        .arrow {
+            color: #60a5fa;
+            font-size: 1.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .arrow-down {
+            text-align: center;
+            font-size: 1.5rem;
+            color: #60a5fa;
+            padding: 0.5rem 0;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(96,165,250,0.3);
+            transform: translateY(-2px);
+        }
+
+        .card h3 {
+            color: #f472b6;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .endpoint {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .method {
+            font-weight: 700;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .method-get { background: #22c55e; color: white; }
+        .method-post { background: #3b82f6; color: white; }
+        .method-delete { background: #ef4444; color: white; }
+
+        .endpoint-path {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            color: #a78bfa;
+        }
+
+        .db-schema {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        th {
+            color: #60a5fa;
+            font-weight: 600;
+            background: rgba(96,165,250,0.1);
+        }
+
+        tr:hover td {
+            background: rgba(96,165,250,0.05);
+        }
+
+        .type {
+            font-family: monospace;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(167,139,250,0.2);
+            color: #a78bfa;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #60a5fa, #a78bfa, #f472b6);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 1rem 1.5rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 3px solid transparent;
+        }
+
+        .timeline-item:hover {
+            border-left-color: #60a5fa;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 1.25rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #60a5fa;
+            border: 2px solid #1a1a2e;
+        }
+
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .tech-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .tech-icon {
+            font-size: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(96,165,250,0.15), rgba(167,139,250,0.15));
+            border: 1px solid rgba(96,165,250,0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #60a5fa;
+        }
+
+        .stat-label {
+            color: #a1a1aa;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.2);
+            border-radius: 8px;
+        }
+
+        .feature-check {
+            color: #22c55e;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #71717a;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 3rem;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-tab {
+            padding: 0.75rem 1.5rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #a1a1aa;
+        }
+
+        .nav-tab:hover, .nav-tab.active {
+            background: rgba(96,165,250,0.2);
+            border-color: #60a5fa;
+            color: #60a5fa;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .container { padding: 1rem; }
+            .flow-row { flex-direction: column; }
+            .arrow { transform: rotate(90deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧪 LLM Evaluation Backend</h1>
+            <p class="subtitle">云原生大语言模型评测系统 - 基于 Go + Kubernetes + OpenCompass</p>
+            <div style="margin-top: 1rem;">
+                <span class="badge badge-go">Go 1.24</span>
+                <span class="badge badge-k8s">Kubernetes</span>
+                <span class="badge badge-api">REST API</span>
+                <span class="badge badge-db">PostgreSQL</span>
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">83</div>
+                <div class="stat-label">验证断言</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">41</div>
+                <div class="stat-label">功能模块</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">5</div>
+                <div class="stat-label">里程碑</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">300+</div>
+                <div class="stat-label">单元测试</div>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('overview')">📐 系统架构</button>
+            <button class="nav-tab" onclick="showTab('api')">🔌 API接口</button>
+            <button class="nav-tab" onclick="showTab('database')">🗄️ 数据库</button>
+            <button class="nav-tab" onclick="showTab('flow')">🔄 数据流</button>
+            <button class="nav-tab" onclick="showTab('tech')">🛠️ 技术栈</button>
+        </div>
+
+        <!-- 系统架构 Tab -->
+        <div id="overview" class="tab-content active">
+            <section>
+                <h2>🏗️ 系统架构图</h2>
+                <div class="architecture-diagram">
+                    <div class="flow-container">
+                        <div class="flow-row" style="justify-content: center;">
+                            <div class="component">
+                                <div class="component-icon">👤</div>
+                                <div class="component-name">用户</div>
+                                <div class="component-desc">HTTP 请求</div>
+                            </div>
+                            <div class="arrow">→</div>
+                            <div class="component" style="background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(59,130,246,0.2)); border-color: rgba(59,130,246,0.3);">
+                                <div class="component-icon">🌐</div>
+                                <div class="component-name">API Gateway</div>
+                                <div class="component-desc">Gin (端口 3100)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="arrow-down">↓</div>
+                        
+                        <div class="flow-row" style="justify-content: center;">
+                            <div class="component">
+                                <div class="component-icon">🐘</div>
+                                <div class="component-name">PostgreSQL</div>
+                                <div class="component-desc">数据存储 (3105)</div>
+                            </div>
+                            <div class="component">
+                                <div class="component-icon">📊</div>
+                                <div class="component-name">Redis</div>
+                                <div class="component-desc">状态缓存 (3106)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="arrow-down">↓</div>
+                        
+                        <div class="flow-row" style="justify-content: center;">
+                            <div class="component" style="background: linear-gradient(135deg, rgba(50,108,229,0.2), rgba(50,108,229,0.2)); border-color: rgba(50,108,229,0.3);">
+                                <div class="component-icon">☸️</div>
+                                <div class="component-name">Kubernetes</div>
+                                <div class="component-desc">Job 编排</div>
+                            </div>
+                        </div>
+                        
+                        <div class="arrow-down">↓</div>
+                        
+                        <div class="flow-row" style="justify-content: center;">
+                            <div class="component">
+                                <div class="component-icon">🐍</div>
+                                <div class="component-name">OpenCompass</div>
+                                <div class="component-desc">LLM 评测框架</div>
+                            </div>
+                        </div>
+                        
+                        <div class="arrow-down">↓</div>
+                        
+                        <div class="flow-row" style="justify-content: center;">
+                            <div class="component">
+                                <div class="component-icon">🤖</div>
+                                <div class="component-name">LLM API</div>
+                                <div class="component-desc">GPT-4 / Claude / Qwen</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>✅ 核心功能</h2>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <div>
+                            <strong>评测任务管理</strong>
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">创建、查询、取消评测任务</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <div>
+                            <strong>异步执行</strong>
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">K8s Job 执行 OpenCompass</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <div>
+                            <strong>结果存储</strong>
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">完整预测数据、评测结果</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <div>
+                            <strong>状态跟踪</strong>
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">Redis 快速状态查询</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <div>
+                            <strong>模型支持</strong>
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">OpenAI、Claude、Qwen API</p>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-check">✓</span>
+                        <div>
+                            <strong>并发处理</strong>
+                            <p style="color: #a1a1aa; font-size: 0.85rem;">乐观锁 + 信号量限制</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- API接口 Tab -->
+        <div id="api" class="tab-content">
+            <section>
+                <h2>🔌 REST API 接口</h2>
+                <div class="grid-3">
+                    <div class="card">
+                        <h3>📋 评测任务</h3>
+                        <div class="endpoint">
+                            <span class="method method-post">POST</span>
+                            <span class="endpoint-path">/api/v1/evaluations</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">创建新评测任务</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/api/v1/evaluations</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">列出所有任务 (分页)</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/api/v1/evaluations/:id</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">获取任务详情</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/api/v1/evaluations/:id/status</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">获取任务状态</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/api/v1/evaluations/:id/results</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">获取评测结果</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-delete">DEL</span>
+                            <span class="endpoint-path">/api/v1/evaluations/:id</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">取消任务</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>🤖 模型与数据集</h3>
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/api/v1/models</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">支持的模型列表</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/api/v1/datasets</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">支持的数据集列表</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>💚 健康检查</h3>
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/health</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">存活探针 (无依赖检查)</p>
+                        
+                        <div class="endpoint">
+                            <span class="method method-get">GET</span>
+                            <span class="endpoint-path">/ready</span>
+                        </div>
+                        <p style="color: #a1a1aa; font-size: 0.8rem; margin: 0.5rem 0;">就绪探针 (DB + Redis)</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>📊 任务状态流转</h2>
+                <div class="architecture-diagram">
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem;">
+                        <div style="background: rgba(234,179,8,0.2); border: 1px solid rgba(234,179,8,0.4); padding: 1rem 2rem; border-radius: 8px; text-align: center;">
+                            <div style="color: #eab308; font-weight: 600;">⏳ pending</div>
+                            <div style="color: #a1a1aa; font-size: 0.8rem;">待处理</div>
+                        </div>
+                        <div style="color: #60a5fa; font-size: 1.5rem;">→</div>
+                        <div style="background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.4); padding: 1rem 2rem; border-radius: 8px; text-align: center;">
+                            <div style="color: #3b82f6; font-weight: 600;">🔄 running</div>
+                            <div style="color: #a1a1aa; font-size: 0.8rem;">执行中</div>
+                        </div>
+                        <div style="color: #60a5fa; font-size: 1.5rem;">→</div>
+                        <div style="background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.4); padding: 1rem 2rem; border-radius: 8px; text-align: center;">
+                            <div style="color: #22c55e; font-weight: 600;">✅ completed</div>
+                            <div style="color: #a1a1aa; font-size: 0.8rem;">已完成</div>
+                        </div>
+                        <div style="display: block; margin: 0.5rem 0;">
+                            <div style="color: #a1a1aa; font-size: 1rem;">↓ ↙ ↘</div>
+                        </div>
+                        <div style="display: flex; gap: 2rem; justify-content: center;">
+                            <div style="background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4); padding: 1rem 2rem; border-radius: 8px; text-align: center;">
+                                <div style="color: #ef4444; font-weight: 600;">❌ failed</div>
+                                <div style="color: #a1a1aa; font-size: 0.8rem;">失败</div>
+                            </div>
+                            <div style="background: rgba(168,85,247,0.2); border: 1px solid rgba(168,85,247,0.4); padding: 1rem 2rem; border-radius: 8px; text-align: center;">
+                                <div style="color: #a855f7; font-weight: 600;">🚫 cancelled</div>
+                                <div style="color: #a1a1aa; font-size: 0.8rem;">已取消</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 数据库 Tab -->
+        <div id="database" class="tab-content">
+            <section>
+                <h2>🗄️ 数据库表结构</h2>
+                <div class="db-schema">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>表名</th>
+                                <th>说明</th>
+                                <th>主要字段</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>evaluations</strong></td>
+                                <td>评测任务表</td>
+                                <td>
+                                    <span class="type">id</span>
+                                    <span class="type">model_id</span>
+                                    <span class="type">dataset_ids</span>
+                                    <span class="type">status</span>
+                                    <span class="type">config</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>models</strong></td>
+                                <td>模型定义表</td>
+                                <td>
+                                    <span class="type">id</span>
+                                    <span class="type">name</span>
+                                    <span class="type">type</span>
+                                    <span class="type">provider</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>datasets</strong></td>
+                                <td>数据集定义表</td>
+                                <td>
+                                    <span class="type">id</span>
+                                    <span class="type">name</span>
+                                    <span class="type">description</span>
+                                    <span class="type">config_template</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>results</strong></td>
+                                <td>评测结果表</td>
+                                <td>
+                                    <span class="type">evaluation_id</span>
+                                    <span class="type">accuracy</span>
+                                    <span class="type">metrics</span>
+                                    <span class="type">summary</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>predictions</strong></td>
+                                <td>预测记录表</td>
+                                <td>
+                                    <span class="type">evaluation_id</span>
+                                    <span class="type">question</span>
+                                    <span class="type">prediction</span>
+                                    <span class="type">answer</span>
+                                    <span class="type">correct</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>logs</strong></td>
+                                <td>执行日志表</td>
+                                <td>
+                                    <span class="type">evaluation_id</span>
+                                    <span class="type">timestamp</span>
+                                    <span class="type">level</span>
+                                    <span class="type">message</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>🔍 索引优化</h2>
+                <div class="grid-3">
+                    <div class="card">
+                        <h3>📈 性能索引</h3>
+                        <ul style="color: #a1a1aa; font-size: 0.9rem; padding-left: 1.5rem;">
+                            <li>evaluations(status) - 状态过滤</li>
+                            <li>evaluations(created_at) - 时间排序</li>
+                            <li>predictions(evaluation_id) - 结果关联</li>
+                            <li>JSONB 索引 - 灵活查询</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>🔗 外键约束</h3>
+                        <ul style="color: #a1a1aa; font-size: 0.9rem; padding-left: 1.5rem;">
+                            <li>results → evaluations</li>
+                            <li>predictions → evaluations</li>
+                            <li>logs → evaluations</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>⚡ 连接池</h3>
+                        <ul style="color: #a1a1aa; font-size: 0.9rem; padding-left: 1.5rem;">
+                            <li>最大连接数: 25</li>
+                            <li>最小连接数: 5</li>
+                            <li>连接超时: 1小时</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 数据流 Tab -->
+        <div id="flow" class="tab-content">
+            <section>
+                <h2>🔄 完整评测流程</h2>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <h4 style="color: #60a5fa; margin-bottom: 0.5rem;">1️⃣ 创建评测任务</h4>
+                        <p style="color: #a1a1aa; font-size: 0.9rem;">
+                            用户发送 <code style="background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 4px;">POST /api/v1/evaluations</code><br>
+                            → API 验证请求<br>
+                            → 创建数据库记录 (status=pending)<br>
+                            → 设置 Redis 缓存 (ttl=24h)
+                        </p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4 style="color: #a78bfa; margin-bottom: 0.5rem;">2️⃣ 启动 K8s Job</h4>
+                        <p style="color: #a1a1aa; font-size: 0.9rem;">
+                            → 后台 goroutine 触发<br>
+                            → 创建 ConfigMap (OpenCompass 配置)<br>
+                            → 创建 Secret (API Keys)<br>
+                            → 创建 Job Pod<br>
+                            → 更新状态 (status=running)
+                        </p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4 style="color: #f472b6; margin-bottom: 0.5rem;">3️⃣ 执行 OpenCompass</h4>
+                        <p style="color: #a1a1aa; font-size: 0.9rem;">
+                            Pod 内执行: <code style="background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 4px;">python run.py</code><br>
+                            → 调用 LLM API 评测<br>
+                            → 生成预测结果<br>
+                            → 写入输出目录
+                        </p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4 style="color: #22c55e; margin-bottom: 0.5rem;">4️⃣ 收集与存储结果</h4>
+                        <p style="color: #a1a1aa; font-size: 0.9rem;">
+                            → 解析 JSON 预测结果<br>
+                            → 提取 CSV 汇总<br>
+                            → 存储到 PostgreSQL<br>
+                            → 更新状态 (status=completed)
+                        </p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4 style="color: #eab308; margin-bottom: 0.5rem;">5️⃣ 清理资源</h4>
+                        <p style="color: #a1a1aa; font-size: 0.9rem;">
+                            → 删除 K8s Job<br>
+                            → 删除 ConfigMap<br>
+                            → 删除 Secret<br>
+                            → 保留数据库记录
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 技术栈 Tab -->
+        <div id="tech" class="tab-content">
+            <section>
+                <h2>🛠️ 技术栈</h2>
+                <div class="tech-stack">
+                    <div class="tech-item">
+                        <span class="tech-icon">🔵</span>
+                        <div>
+                            <strong>Go 1.24</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">后端运行时</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">🌿</span>
+                        <div>
+                            <strong>Gin v1.10</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">Web 框架</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">🐘</span>
+                        <div>
+                            <strong>PostgreSQL 17</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">主数据库</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">📦</span>
+                        <div>
+                            <strong>pgx v5</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">PostgreSQL 驱动</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">🔴</span>
+                        <div>
+                            <strong>Redis 7</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">缓存 / 队列</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">☸️</span>
+                        <div>
+                            <strong>Kubernetes</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">容器编排</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">🐍</span>
+                        <div>
+                            <strong>OpenCompass</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">LLM 评测框架</p>
+                        </div>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-icon">🔑</span>
+                        <div>
+                            <strong>client-go</strong>
+                            <p style="color: #a1a1aa; font-size: 0.8rem;">K8s API 客户端</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>📁 项目结构</h2>
+                <div class="db-schema">
+                    <pre style="font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; line-height: 1.6; color: #a1a1aa;">
+├── cmd/
+│   └── api/
+│       └── main.go                 # 入口点
+├── internal/
+│   ├── handler/                   # HTTP 处理器
+│   ├── service/                   # 业务逻辑
+│   ├── repository/                # 数据访问层
+│   ├── model/                     # 领域模型
+│   ├── config/                    # 配置管理
+│   ├── cache/                     # Redis 缓存
+│   ├── k8s/                       # Kubernetes 集成
+│   │   ├── client.go              # K8s 客户端
+│   │   ├── job/                   # Job 管理
+│   │   ├── configmap/             # ConfigMap 生成
+│   │   ├── secret/                # Secret 管理
+│   │   └── monitor/               # 状态监控
+│   └── evaluator/                  # OpenCompass 集成
+│       ├── config.go              # 配置生成
+│       ├── cli.go                 # CLI 封装
+│       └── parser.go              # 结果解析
+├── configs/
+│   └── config.yaml                # 应用配置
+├── migrations/                    # 数据库迁移
+│   └── *.sql
+└── go.mod</pre>
+                </div>
+            </section>
+
+            <section>
+                <h2>🚀 端口配置</h2>
+                <div class="grid-3">
+                    <div class="card">
+                        <h3>🌐 API 服务</h3>
+                        <div style="font-size: 2rem; color: #60a5fa; font-weight: 700;">3100</div>
+                    </div>
+                    <div class="card">
+                        <h3>🐘 PostgreSQL</h3>
+                        <div style="font-size: 2rem; color: #336791; font-weight: 700;">3105</div>
+                    </div>
+                    <div class="card">
+                        <h3>🔴 Redis</h3>
+                        <div style="font-size: 2rem; color: #dc2626; font-weight: 700;">3106</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>LLM Evaluation Backend - 云原生大语言模型评测系统</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                技术栈: Go + Gin + PostgreSQL + Redis + Kubernetes + OpenCompass
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update nav buttons
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>
