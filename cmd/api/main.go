@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -54,6 +53,10 @@ func main() {
 	// Create evaluation handler
 	evalHandler := handler.NewEvaluationHandler(evalRepo, redisClient, modelRepo, datasetRepo, resultRepo, predictionRepo)
 
+	// Create models and datasets handlers
+	modelsHandler := handler.NewModelsHandler()
+	datasetsHandler := handler.NewDatasetsHandler()
+
 	// Health endpoints (liveness and readiness)
 	r.GET("/health", healthHandler.Health)
 	r.GET("/ready", healthHandler.Ready)
@@ -69,20 +72,9 @@ func main() {
 		v1.GET("/evaluations/:id/results", evalHandler.GetResults)
 		v1.DELETE("/evaluations/:id", evalHandler.CancelEvaluation)
 
-		v1.GET("/models", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"models": []gin.H{
-				{"id": "gpt-4", "name": "GPT-4", "provider": "openai"},
-				{"id": "claude", "name": "Claude", "provider": "anthropic"},
-				{"id": "qwen", "name": "Qwen", "provider": "dashscope"},
-			}})
-		})
-
-		v1.GET("/datasets", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"datasets": []gin.H{
-				{"id": "mmlu", "name": "MMLU", "description": "Massive Multitask Language Understanding"},
-				{"id": "hellaswag", "name": "HellaSwag", "description": "Commonsense NLI tasks"},
-			}})
-		})
+		// Models and datasets endpoints
+		v1.GET("/models", modelsHandler.ListModels)
+		v1.GET("/datasets", datasetsHandler.ListDatasets)
 	}
 
 	// Start server on configured port
