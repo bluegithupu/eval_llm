@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/eval_llm/backend/internal/cache"
+	"github.com/gin-gonic/gin"
 )
 
 // DatabaseHealthChecker defines the interface for database health checking
@@ -35,7 +35,7 @@ type HealthResponse struct {
 
 // ReadyResponse represents the response for /ready endpoint
 type ReadyResponse struct {
-	Status       string                     `json:"status"`
+	Status       string                      `json:"status"`
 	Dependencies map[string]DependencyStatus `json:"dependencies"`
 }
 

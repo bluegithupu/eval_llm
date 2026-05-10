@@ -34,6 +34,25 @@ type EvaluationHandler struct {
 	datasetRepo repository.DatasetRepository
 }
 
+// ListEvaluationsResponse represents the response for listing evaluations
+type ListEvaluationsResponse struct {
+	Tasks []EvaluationListItem `json:"tasks"`
+	Page  int                  `json:"page"`
+	Limit int                  `json:"limit"`
+	Total int                  `json:"total"`
+	Pages int                  `json:"pages"`
+}
+
+// EvaluationListItem represents a single evaluation in the list response
+type EvaluationListItem struct {
+	ID        string                 `json:"id"`
+	Model     string                 `json:"model"`
+	Dataset   string                 `json:"dataset"`
+	Status    model.EvaluationStatus `json:"status"`
+	Progress  int                    `json:"progress"`
+	CreatedAt string                 `json:"created_at"`
+}
+
 // NewEvaluationHandler creates a new evaluation handler
 func NewEvaluationHandler(
 	evalRepo repository.EvaluationRepository,
@@ -192,4 +211,96 @@ func (h *EvaluationHandler) CreateEvaluation(c *gin.Context) {
 
 	// Return 202 Accepted (not 201 Created) - async processing (VAL-API-002)
 	c.JSON(http.StatusAccepted, response)
+}
+
+// ListEvaluations handles GET /api/v1/evaluations with pagination
+// Supports page and limit query parameters (default: page=1, limit=10)
+// Returns tasks array, total count, pages calculation
+func (h *EvaluationHandler) ListEvaluations(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Parse pagination parameters with defaults (VAL-API-008)
+	page := 1
+	limit := 10
+
+	// Parse page parameter
+	if pageStr := c.Query("page"); pageStr != "" {
+		var parsedPage int
+		if _, err := fmt.Sscanf(pageStr, "%d", &parsedPage); err != nil || parsedPage < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid page parameter: must be a positive integer",
+			})
+			return
+		}
+		page = parsedPage
+	}
+
+	// Parse limit parameter
+	if limitStr := c.Query("limit"); limitStr != "" {
+		var parsedLimit int
+		if _, err := fmt.Sscanf(limitStr, "%d", &parsedLimit); err != nil || parsedLimit < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid limit parameter: must be a positive integer",
+			})
+			return
+		}
+		limit = parsedLimit
+	}
+
+	// Get evaluations with pagination from repository
+	evaluations, total, err := h.evalRepo.List(ctx, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to retrieve evaluations",
+		})
+		return
+	}
+
+	// Calculate total pages (VAL-API-011)
+	pages := 0
+	if total > 0 && limit > 0 {
+		pages = (total + limit - 1) / limit // ceil(total / limit)
+	}
+
+	// Convert evaluations to list items
+	// For each evaluation, we need to get the model and dataset names
+	tasks := make([]EvaluationListItem, 0, len(evaluations))
+	for _, eval := range evaluations {
+		// Get model name
+		modelName := ""
+		if eval.ModelID != "" {
+			if modelEntity, err := h.modelRepo.GetByID(ctx, eval.ModelID); err == nil {
+				modelName = modelEntity.Name
+			}
+		}
+
+		// Get dataset name (first dataset ID)
+		datasetName := ""
+		if len(eval.DatasetIDs) > 0 && eval.DatasetIDs[0] != "" {
+			if datasetEntity, err := h.datasetRepo.GetByID(ctx, eval.DatasetIDs[0]); err == nil {
+				datasetName = datasetEntity.Name
+			}
+		}
+
+		item := EvaluationListItem{
+			ID:        eval.ID,
+			Model:     modelName,
+			Dataset:   datasetName,
+			Status:    eval.Status,
+			Progress:  eval.Progress,
+			CreatedAt: eval.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		tasks = append(tasks, item)
+	}
+
+	// Build response (VAL-API-008, VAL-API-009, VAL-API-010, VAL-API-011)
+	response := ListEvaluationsResponse{
+		Tasks: tasks,
+		Page:  page,
+		Limit: limit,
+		Total: total,
+		Pages: pages,
+	}
+
+	c.JSON(http.StatusOK, response)
 }

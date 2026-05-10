@@ -112,7 +112,7 @@ func TestReady_Returns200WhenAllHealthy(t *testing.T) {
 	mockCache := new(MockCache)
 	mockDB.On("Ping", mock.Anything).Return(nil)
 	mockCache.On("Ping", mock.Anything).Return(nil)
-	
+
 	handler := NewHealthHandler(mockDB, mockCache)
 	router := setupTestRouter(handler)
 
@@ -123,7 +123,7 @@ func TestReady_Returns200WhenAllHealthy(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
@@ -141,7 +141,7 @@ func TestReady_Returns503WhenDBUnhealthy(t *testing.T) {
 	mockCache := new(MockCache)
 	mockDB.On("Ping", mock.Anything).Return(errors.New("connection refused"))
 	mockCache.On("Ping", mock.Anything).Return(nil)
-	
+
 	handler := NewHealthHandler(mockDB, mockCache)
 	router := setupTestRouter(handler)
 
@@ -152,7 +152,7 @@ func TestReady_Returns503WhenDBUnhealthy(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
@@ -171,7 +171,7 @@ func TestReady_Returns503WhenRedisUnhealthy(t *testing.T) {
 	mockCache := new(MockCache)
 	mockDB.On("Ping", mock.Anything).Return(nil)
 	mockCache.On("Ping", mock.Anything).Return(errors.New("redis connection error"))
-	
+
 	handler := NewHealthHandler(mockDB, mockCache)
 	router := setupTestRouter(handler)
 
@@ -182,7 +182,7 @@ func TestReady_Returns503WhenRedisUnhealthy(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
@@ -201,7 +201,7 @@ func TestReady_Returns503WhenBothUnhealthy(t *testing.T) {
 	mockCache := new(MockCache)
 	mockDB.On("Ping", mock.Anything).Return(errors.New("db error"))
 	mockCache.On("Ping", mock.Anything).Return(errors.New("redis error"))
-	
+
 	handler := NewHealthHandler(mockDB, mockCache)
 	router := setupTestRouter(handler)
 
@@ -212,7 +212,7 @@ func TestReady_Returns503WhenBothUnhealthy(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
@@ -228,7 +228,7 @@ func TestReady_Returns503WhenDBNotInitialized(t *testing.T) {
 	// Arrange
 	mockCache := new(MockCache)
 	mockCache.On("Ping", mock.Anything).Return(nil)
-	
+
 	handler := NewHealthHandler(nil, mockCache) // DB is nil
 	router := setupTestRouter(handler)
 
@@ -239,7 +239,7 @@ func TestReady_Returns503WhenDBNotInitialized(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
@@ -255,7 +255,7 @@ func TestReady_Returns503WhenCacheNotInitialized(t *testing.T) {
 	// Arrange
 	mockDB := new(MockDatabase)
 	mockDB.On("Ping", mock.Anything).Return(nil)
-	
+
 	handler := NewHealthHandler(mockDB, nil) // Cache is nil
 	router := setupTestRouter(handler)
 
@@ -266,7 +266,7 @@ func TestReady_Returns503WhenCacheNotInitialized(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
@@ -284,7 +284,7 @@ func TestReady_IncludesIndividualDependencyStatus(t *testing.T) {
 	mockCache := new(MockCache)
 	mockDB.On("Ping", mock.Anything).Return(nil)
 	mockCache.On("Ping", mock.Anything).Return(nil)
-	
+
 	handler := NewHealthHandler(mockDB, mockCache)
 	router := setupTestRouter(handler)
 
@@ -295,15 +295,15 @@ func TestReady_IncludesIndividualDependencyStatus(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var response ReadyResponse
 	err := parseJSONResponse(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	
+
 	// Verify both dependencies are present
 	assert.Contains(t, response.Dependencies, "database")
 	assert.Contains(t, response.Dependencies, "redis")
-	
+
 	// Verify each has status field
 	assert.NotEmpty(t, response.Dependencies["database"].Status)
 	assert.NotEmpty(t, response.Dependencies["redis"].Status)

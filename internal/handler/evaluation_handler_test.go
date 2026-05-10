@@ -160,6 +160,7 @@ func setupEvalTestRouter(handler *EvaluationHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/api/v1/evaluations", handler.CreateEvaluation)
+	router.GET("/api/v1/evaluations", handler.ListEvaluations)
 	return router
 }
 
@@ -385,4 +386,261 @@ func TestCreateEvaluation_InvalidDataset(t *testing.T) {
 
 	mockModelRepo.AssertExpectations(t)
 	mockDatasetRepo.AssertExpectations(t)
+}
+
+// TestListEvaluations_DefaultPagination tests VAL-API-008
+func TestListEvaluations_DefaultPagination(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	// Mock expectations - empty list
+	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{}, 0, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request without pagination params (should use defaults)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify response
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify default pagination (VAL-API-008)
+	assert.Equal(t, float64(1), response["page"])
+	assert.Equal(t, float64(10), response["limit"])
+	assert.Equal(t, float64(0), response["total"])
+	assert.Equal(t, float64(0), response["pages"])
+	assert.NotNil(t, response["tasks"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestListEvaluations_CustomPagination tests VAL-API-009
+func TestListEvaluations_CustomPagination(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	modelID := uuid.New().String()
+	datasetID := uuid.New().String()
+	evalID := uuid.New().String()
+
+	// Mock expectations - list with one item
+	mockEvalRepo.On("List", mock.Anything, 2, 5).Return([]*model.Evaluation{
+		{
+			ID:         evalID,
+			ModelID:    modelID,
+			DatasetIDs: []string{datasetID},
+			Status:     model.StatusPending,
+			Progress:   0,
+		},
+	}, 1, nil)
+	mockModelRepo.On("GetByID", mock.Anything, modelID).Return(&model.Model{ID: modelID, Name: "gpt-4"}, nil)
+	mockDatasetRepo.On("GetByID", mock.Anything, datasetID).Return(&model.Dataset{ID: datasetID, Name: "mmlu"}, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request with custom pagination
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations?page=2&limit=5", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify response
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify custom pagination (VAL-API-009)
+	assert.Equal(t, float64(2), response["page"])
+	assert.Equal(t, float64(5), response["limit"])
+	assert.Equal(t, float64(1), response["total"])
+	assert.Equal(t, float64(1), response["pages"]) // ceil(1/5) = 1
+
+	// Verify task in response
+	tasks := response["tasks"].([]interface{})
+	assert.Len(t, tasks, 1)
+
+	mockEvalRepo.AssertExpectations(t)
+	mockModelRepo.AssertExpectations(t)
+	mockDatasetRepo.AssertExpectations(t)
+}
+
+// TestListEvaluations_TotalCount tests VAL-API-010
+func TestListEvaluations_TotalCount(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	// Mock expectations - 25 total items, returning first page
+	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{
+		{ID: uuid.New().String(), Status: model.StatusPending},
+		{ID: uuid.New().String(), Status: model.StatusPending},
+	}, 25, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify total count (VAL-API-010)
+	assert.Equal(t, float64(25), response["total"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestListEvaluations_PagesCalculation tests VAL-API-011
+func TestListEvaluations_PagesCalculation(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	// Test case: 25 total items, 10 per page = 3 pages (VAL-API-011)
+	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{}, 25, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify pages calculation: ceil(25/10) = 3 (VAL-API-011)
+	assert.Equal(t, float64(3), response["pages"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestListEvaluations_InvalidPage tests VAL-API-008 (invalid page returns 400)
+func TestListEvaluations_InvalidPage(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request with invalid page (negative)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations?page=-1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 400 response
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "page")
+}
+
+// TestListEvaluations_InvalidLimit tests VAL-API-008 (invalid limit returns 400)
+func TestListEvaluations_InvalidLimit(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request with invalid limit (zero)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations?limit=0", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Verify 400 response
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.Contains(t, response, "error")
+	assert.Contains(t, response["error"].(string), "limit")
+}
+
+// TestListEvaluations_EmptyList tests VAL-API-008 (empty list returns empty array)
+func TestListEvaluations_EmptyList(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	// Mock expectations - empty list
+	mockEvalRepo.On("List", mock.Anything, 1, 10).Return([]*model.Evaluation{}, 0, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify empty list response (VAL-API-008)
+	tasks := response["tasks"].([]interface{})
+	assert.Len(t, tasks, 0)
+	assert.Equal(t, float64(0), response["total"])
+	assert.Equal(t, float64(0), response["pages"])
+
+	mockEvalRepo.AssertExpectations(t)
+}
+
+// TestListEvaluations_PageBeyondRange tests VAL-API-008 (page beyond range returns empty array)
+func TestListEvaluations_PageBeyondRange(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockCache := new(MockStatusCache)
+	mockModelRepo := new(MockModelRepository)
+	mockDatasetRepo := new(MockDatasetRepository)
+
+	// Mock expectations - page beyond range, returns empty but total is 10 (2 pages total)
+	mockEvalRepo.On("List", mock.Anything, 100, 10).Return([]*model.Evaluation{}, 10, nil)
+
+	handler := NewEvaluationHandler(mockEvalRepo, mockCache, mockModelRepo, mockDatasetRepo)
+	router := setupEvalTestRouter(handler)
+
+	// Request with page way beyond range
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/evaluations?page=100", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+
+	// Verify empty array for page beyond range (VAL-API-008)
+	tasks := response["tasks"].([]interface{})
+	assert.Len(t, tasks, 0)
+	assert.Equal(t, float64(10), response["total"])
+	assert.Equal(t, float64(1), response["pages"]) // ceil(10/10) = 1
+
+	mockEvalRepo.AssertExpectations(t)
 }
