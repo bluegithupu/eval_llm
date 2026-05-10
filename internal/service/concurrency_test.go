@@ -296,10 +296,10 @@ func TestConcurrencyManager_FailEvaluation_TerminalState(t *testing.T) {
 	evalRepo := newTestEvalRepo()
 
 	eval := &model.Evaluation{
-		ID:       "eval-123",
-		ModelID:  "model-456",
-		Status:   model.StatusCompleted,
-		Version:  0,
+		ID:      "eval-123",
+		ModelID: "model-456",
+		Status:  model.StatusCompleted,
+		Version: 0,
 	}
 	evalRepo.evaluations[eval.ID] = eval
 
@@ -317,10 +317,10 @@ func TestConcurrencyManager_CancelEvaluation(t *testing.T) {
 	orch := &testOrchestrator{}
 
 	eval := &model.Evaluation{
-		ID:       "eval-123",
-		ModelID:  "model-456",
-		Status:   model.StatusRunning,
-		Version:  0,
+		ID:      "eval-123",
+		ModelID: "model-456",
+		Status:  model.StatusRunning,
+		Version: 0,
 	}
 	evalRepo.evaluations[eval.ID] = eval
 
@@ -370,10 +370,10 @@ func TestConcurrencyManager_CompleteEvaluation_NotRunning(t *testing.T) {
 	evalRepo := newTestEvalRepo()
 
 	eval := &model.Evaluation{
-		ID:       "eval-123",
-		ModelID:  "model-456",
-		Status:   model.StatusPending,
-		Version:  0,
+		ID:      "eval-123",
+		ModelID: "model-456",
+		Status:  model.StatusPending,
+		Version: 0,
 	}
 	evalRepo.evaluations[eval.ID] = eval
 
@@ -438,11 +438,11 @@ func TestConcurrencyManager_StartEvaluation(t *testing.T) {
 	orch := &testOrchestrator{}
 
 	eval := &model.Evaluation{
-		ID:        "eval-123",
-		ModelID:   "model-456",
+		ID:         "eval-123",
+		ModelID:    "model-456",
 		DatasetIDs: []string{"dataset-789"},
-		Status:    model.StatusPending,
-		Version:   0,
+		Status:     model.StatusPending,
+		Version:    0,
 	}
 	evalRepo.evaluations[eval.ID] = eval
 
@@ -468,10 +468,10 @@ func TestConcurrencyManager_StartEvaluation_AlreadyRunning(t *testing.T) {
 	evalRepo := newTestEvalRepo()
 
 	eval := &model.Evaluation{
-		ID:       "eval-123",
-		ModelID:  "model-456",
-		Status:   model.StatusRunning,
-		Version:  1,
+		ID:      "eval-123",
+		ModelID: "model-456",
+		Status:  model.StatusRunning,
+		Version: 1,
 	}
 	evalRepo.evaluations[eval.ID] = eval
 
@@ -578,11 +578,11 @@ func TestConcurrencyManager_OrchestratorError(t *testing.T) {
 	orch := &testOrchestrator{startErr: errors.New("orchestrator failed")}
 
 	eval := &model.Evaluation{
-		ID:        "eval-123",
-		ModelID:   "model-456",
+		ID:         "eval-123",
+		ModelID:    "model-456",
 		DatasetIDs: []string{"dataset-789"},
-		Status:    model.StatusPending,
-		Version:   0,
+		Status:     model.StatusPending,
+		Version:    0,
 	}
 	evalRepo.evaluations[eval.ID] = eval
 
