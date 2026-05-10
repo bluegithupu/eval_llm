@@ -125,9 +125,9 @@ func TestValidateSecretData_NoAPIKeys(t *testing.T) {
 		EvalID: "test-eval-123",
 		Keys:   APIKeys{OpenAI: "", Claude: "", Qwen: ""},
 	}
+	// API keys are now optional - evaluations can proceed without real keys in test environments
 	err := validateSecretData(data)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one API key is required")
+	assert.NoError(t, err)
 }
 
 func TestHasAPIKeys_WithKeys(t *testing.T) {

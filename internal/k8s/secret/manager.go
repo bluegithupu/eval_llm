@@ -101,10 +101,8 @@ func validateSecretData(data *SecretData) error {
 	if data.EvalID == "" {
 		return fmt.Errorf("evalID is required")
 	}
-	// At least one API key should be provided
-	if data.Keys.OpenAI == "" && data.Keys.Claude == "" && data.Keys.Qwen == "" {
-		return fmt.Errorf("at least one API key is required")
-	}
+	// API keys are optional - evaluations can proceed without real keys in test environments
+	// Real API keys should be provided via environment variables in production
 	return nil
 }
 

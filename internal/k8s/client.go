@@ -86,13 +86,9 @@ func NewClient(cfg *ClientConfig) (*Client, error) {
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			// Fall back to default kubeconfig location
-			config, err = rest.InClusterConfig()
+			config, err = loadKubeconfig("", "")
 			if err != nil {
-				// Try default kubeconfig path
-				config, err = loadKubeconfig("", "")
-				if err != nil {
-					return nil, fmt.Errorf("failed to create Kubernetes config: %w", err)
-				}
+				return nil, fmt.Errorf("failed to create Kubernetes config: %w", err)
 			}
 		}
 	}
