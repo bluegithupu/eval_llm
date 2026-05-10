@@ -104,7 +104,7 @@ func NewClient(cfg *ClientConfig) (*Client, error) {
 	}
 
 	return &Client{
-		clientset:  clientset,
+		clientset: clientset,
 		namespace: cfg.Namespace,
 		config:    config,
 	}, nil
@@ -121,9 +121,9 @@ func loadKubeconfig(kubeconfigPath, context string) (*rest.Config, error) {
 
 // Client wraps the Kubernetes clientset with additional functionality
 type Client struct {
-	clientset  kubernetes.Interface
-	namespace  string
-	config      *rest.Config
+	clientset kubernetes.Interface
+	namespace string
+	config    *rest.Config
 }
 
 // Namespace returns the configured namespace

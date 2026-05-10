@@ -19,15 +19,15 @@ func TestDefaultClientConfig(t *testing.T) {
 
 func TestConfigOptions(t *testing.T) {
 	cfg := &ClientConfig{}
-	
+
 	// Test WithNamespace
 	WithNamespace("test-ns")(cfg)
 	assert.Equal(t, "test-ns", cfg.Namespace)
-	
+
 	// Test WithKubeconfig
 	WithKubeconfig("/path/to/kubeconfig")(cfg)
 	assert.Equal(t, "/path/to/kubeconfig", cfg.KubeconfigPath)
-	
+
 	// Test WithContext
 	WithContext("my-context")(cfg)
 	assert.Equal(t, "my-context", cfg.Context)
@@ -35,7 +35,7 @@ func TestConfigOptions(t *testing.T) {
 
 func TestLabels(t *testing.T) {
 	labels := Labels("eval-123", "gpt-4", "MMLU")
-	
+
 	assert.Equal(t, AppLabelValue, labels[AppLabelKey])
 	assert.Equal(t, "eval-123", labels[EvalIDLabelKey])
 	assert.Equal(t, "gpt-4", labels[ModelLabelKey])
@@ -65,9 +65,9 @@ func TestModelLabels(t *testing.T) {
 func TestMergeLabels(t *testing.T) {
 	map1 := map[string]string{"key1": "value1", "key2": "value2"}
 	map2 := map[string]string{"key2": "overridden", "key3": "value3"}
-	
+
 	result := MergeLabels(map1, map2)
-	
+
 	assert.Equal(t, "value1", result["key1"])
 	assert.Equal(t, "overridden", result["key2"])
 	assert.Equal(t, "value3", result["key3"])
@@ -78,7 +78,7 @@ func TestLabelSelector(t *testing.T) {
 		"app":     "llm-eval",
 		"eval-id": "test-123",
 	}
-	
+
 	selector := LabelSelector(labels)
 	assert.Contains(t, selector, "app=llm-eval")
 	assert.Contains(t, selector, "eval-id=test-123")
@@ -103,7 +103,7 @@ func TestModelSelector(t *testing.T) {
 
 func TestHasLabel(t *testing.T) {
 	labels := map[string]string{"app": "llm-eval", "eval-id": "test"}
-	
+
 	assert.True(t, HasLabel(labels, "app", "llm-eval"))
 	assert.False(t, HasLabel(labels, "app", "other"))
 	assert.False(t, HasLabel(labels, "nonexistent", "value"))
@@ -112,7 +112,7 @@ func TestHasLabel(t *testing.T) {
 func TestHasAppLabel(t *testing.T) {
 	validLabels := map[string]string{"app": "llm-eval"}
 	invalidLabels := map[string]string{"app": "other"}
-	
+
 	assert.True(t, HasAppLabel(validLabels))
 	assert.False(t, HasAppLabel(invalidLabels))
 	assert.False(t, HasAppLabel(nil))
@@ -120,18 +120,18 @@ func TestHasAppLabel(t *testing.T) {
 
 func TestHasEvalIDLabel(t *testing.T) {
 	labels := map[string]string{"app": "llm-eval", "eval-id": "eval-123"}
-	
+
 	assert.True(t, HasEvalIDLabel(labels, "eval-123"))
 	assert.False(t, HasEvalIDLabel(labels, "eval-456"))
 }
 
 func TestGetLabelValue(t *testing.T) {
 	labels := map[string]string{"app": "llm-eval", "eval-id": "test"}
-	
+
 	value, ok := GetLabelValue(labels, "app")
 	assert.True(t, ok)
 	assert.Equal(t, "llm-eval", value)
-	
+
 	value, ok = GetLabelValue(labels, "nonexistent")
 	assert.False(t, ok)
 	assert.Empty(t, value)
@@ -139,7 +139,7 @@ func TestGetLabelValue(t *testing.T) {
 
 func TestOwnerReference(t *testing.T) {
 	ref := OwnerReference("batch/v1", "Job", "my-job", "uid-123")
-	
+
 	assert.Equal(t, "batch/v1", ref.APIVersion)
 	assert.Equal(t, "Job", ref.Kind)
 	assert.Equal(t, "my-job", ref.Name)
@@ -152,7 +152,7 @@ func TestOwnerReference(t *testing.T) {
 
 func TestJobOwnerReference(t *testing.T) {
 	ref := JobOwnerReference("eval-job-1", "uid-abc")
-	
+
 	assert.Equal(t, "batch/v1", ref.APIVersion)
 	assert.Equal(t, "Job", ref.Kind)
 	assert.Equal(t, "eval-job-1", ref.Name)
@@ -161,7 +161,7 @@ func TestJobOwnerReference(t *testing.T) {
 
 func TestConfigMapOwnerReference(t *testing.T) {
 	ref := ConfigMapOwnerReference("my-config", "uid-def")
-	
+
 	assert.Equal(t, "v1", ref.APIVersion)
 	assert.Equal(t, "ConfigMap", ref.Kind)
 	assert.Equal(t, "my-config", ref.Name)
@@ -169,7 +169,7 @@ func TestConfigMapOwnerReference(t *testing.T) {
 
 func TestSecretOwnerReference(t *testing.T) {
 	ref := SecretOwnerReference("my-secret", "uid-ghi")
-	
+
 	assert.Equal(t, "v1", ref.APIVersion)
 	assert.Equal(t, "Secret", ref.Kind)
 	assert.Equal(t, "my-secret", ref.Name)
@@ -182,20 +182,20 @@ func TestAddOwnerReference(t *testing.T) {
 		Kind:       "Job",
 		Name:       "my-job",
 	}
-	
+
 	AddOwnerReference(obj, owner)
-	
+
 	require.Len(t, obj.OwnerReferences, 1)
 	assert.Equal(t, "my-job", obj.OwnerReferences[0].Name)
 }
 
 func TestSetController(t *testing.T) {
 	ref := &metav1.OwnerReference{}
-	
+
 	SetController(ref, true)
 	require.NotNil(t, ref.Controller)
 	assert.True(t, *ref.Controller)
-	
+
 	SetController(ref, false)
 	require.NotNil(t, ref.Controller)
 	assert.False(t, *ref.Controller)
@@ -210,14 +210,14 @@ func TestIsControlledBy(t *testing.T) {
 			},
 		},
 	}
-	
+
 	assert.True(t, IsControlledBy(obj, uid))
 	assert.False(t, IsControlledBy(obj, types.UID("other-uid")))
 }
 
 func TestDefaultResourceRequirements(t *testing.T) {
 	reqs := DefaultResourceRequirements()
-	
+
 	assert.Equal(t, "500m", reqs.CPURequest)
 	assert.Equal(t, "1000m", reqs.CPULimit)
 	assert.Equal(t, "512Mi", reqs.MemoryRequest)
@@ -231,20 +231,20 @@ func TestResourceRequirementsToK8s(t *testing.T) {
 		MemoryRequest: "256Mi",
 		MemoryLimit:   "512Mi",
 	}
-	
+
 	k8sReqs := reqs.ToK8sResources()
-	
+
 	// Check requests
 	cpuReq := k8sReqs.Requests[v1.ResourceCPU]
 	assert.Equal(t, "250m", cpuReq.String())
-	
+
 	memReq := k8sReqs.Requests[v1.ResourceMemory]
 	assert.Equal(t, "256Mi", memReq.String())
-	
+
 	// Check limits
 	cpuLim := k8sReqs.Limits[v1.ResourceCPU]
 	assert.Equal(t, "500m", cpuLim.String())
-	
+
 	memLim := k8sReqs.Limits[v1.ResourceMemory]
 	assert.Equal(t, "512Mi", memLim.String())
 }

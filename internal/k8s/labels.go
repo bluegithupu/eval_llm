@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -38,7 +38,7 @@ func EvalIDLabels(evalID string) map[string]string {
 // ModelLabels returns labels for a specific model
 func ModelLabels(modelName string) map[string]string {
 	return map[string]string{
-		AppLabelKey:  AppLabelValue,
+		AppLabelKey:   AppLabelValue,
 		ModelLabelKey: modelName,
 	}
 }
