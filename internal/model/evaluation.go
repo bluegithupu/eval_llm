@@ -19,32 +19,32 @@ const (
 
 // Evaluation represents an evaluation task
 type Evaluation struct {
-	ID          string          `json:"id"`
-	ModelID     string          `json:"model_id"`
-	DatasetIDs  []string        `json:"dataset_ids"`
-	Config      map[string]any  `json:"config"`
+	ID          string           `json:"id"`
+	ModelID     string           `json:"model_id"`
+	DatasetIDs  []string         `json:"dataset_ids"`
+	Config      map[string]any   `json:"config"`
 	Status      EvaluationStatus `json:"status"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
-	StartedAt   *time.Time      `json:"started_at,omitempty"`
-	CompletedAt *time.Time      `json:"completed_at,omitempty"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
+	StartedAt   *time.Time       `json:"started_at,omitempty"`
+	CompletedAt *time.Time       `json:"completed_at,omitempty"`
 }
 
 // Model represents a supported model
 type Model struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Type       string `json:"type"` // "api" or "local"
-	Provider   string `json:"provider"` // "openai", "anthropic", "dashscope"
-	APIKeyRef  string `json:"api_key_ref,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`     // "api" or "local"
+	Provider  string `json:"provider"` // "openai", "anthropic", "dashscope"
+	APIKeyRef string `json:"api_key_ref,omitempty"`
 }
 
 // Dataset represents a supported dataset
 type Dataset struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
-	ConfigTemplate  string `json:"config_template"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	ConfigTemplate string `json:"config_template"`
 }
 
 // Result represents evaluation results

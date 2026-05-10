@@ -60,10 +60,10 @@ func main() {
 	// Start server on port 3100
 	port := "3100"
 	log.Printf("Starting API server on port %s", port)
-	
+
 	// Validate UUID generation is working (will be used for task IDs)
 	_ = uuid.New()
-	
+
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

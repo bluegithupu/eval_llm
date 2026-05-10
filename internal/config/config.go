@@ -8,9 +8,9 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	Server    ServerConfig
-	Database  DatabaseConfig
-	Redis     RedisConfig
+	Server     ServerConfig
+	Database   DatabaseConfig
+	Redis      RedisConfig
 	Kubernetes KubernetesConfig
 	Evaluation EvaluationConfig
 }
@@ -23,11 +23,11 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
-	Host         string
-	Port         int
-	Name         string
-	User         string
-	Password     string
+	Host           string
+	Port           int
+	Name           string
+	User           string
+	Password       string
 	MaxConnections int
 }
 
@@ -40,9 +40,9 @@ type RedisConfig struct {
 
 // KubernetesConfig holds Kubernetes configuration
 type KubernetesConfig struct {
-	Namespace   string
-	JobTimeout  time.Duration
-	JobRetries  int
+	Namespace  string
+	JobTimeout time.Duration
+	JobRetries int
 }
 
 // EvaluationConfig holds evaluation configuration
@@ -59,11 +59,11 @@ func Load() *Config {
 			Timeout: getEnvDuration("API_TIMEOUT", 30*time.Second),
 		},
 		Database: DatabaseConfig{
-			Host:         getEnv("DB_HOST", "localhost"),
-			Port:         getEnvInt("DB_PORT", 3105),
-			Name:         getEnv("DB_NAME", "evaluations"),
-			User:         getEnv("DB_USER", "eval_user"),
-			Password:     getEnv("DB_PASSWORD", "eval_pass"),
+			Host:           getEnv("DB_HOST", "localhost"),
+			Port:           getEnvInt("DB_PORT", 3105),
+			Name:           getEnv("DB_NAME", "evaluations"),
+			User:           getEnv("DB_USER", "eval_user"),
+			Password:       getEnv("DB_PASSWORD", "eval_pass"),
 			MaxConnections: getEnvInt("DB_MAX_CONNECTIONS", 25),
 		},
 		Redis: RedisConfig{
