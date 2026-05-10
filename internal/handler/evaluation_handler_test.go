@@ -70,6 +70,16 @@ func (m *MockEvaluationRepository) CountByStatus(ctx context.Context, status mod
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockEvaluationRepository) UpdateStatusAtomic(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int) error {
+	args := m.Called(ctx, id, expectedVersion, status, progress)
+	return args.Error(0)
+}
+
+func (m *MockEvaluationRepository) UpdateStatusAtomicWithError(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int, errorMsg string) error {
+	args := m.Called(ctx, id, expectedVersion, status, progress, errorMsg)
+	return args.Error(0)
+}
+
 // MockStatusCache for testing
 type MockStatusCache struct {
 	mock.Mock

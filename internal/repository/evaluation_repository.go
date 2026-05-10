@@ -19,6 +19,12 @@ type EvaluationRepository interface {
 	List(ctx context.Context, page, limit int) ([]*model.Evaluation, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.EvaluationStatus, progress int) error
 	UpdateStatusWithError(ctx context.Context, id string, status model.EvaluationStatus, progress int, errorMsg string) error
+	// UpdateStatusAtomic performs an atomic status update with optimistic locking
+	// It only succeeds if the current version matches expectedVersion
+	// Returns ErrConcurrentModification if version doesn't match
+	UpdateStatusAtomic(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int) error
+	// UpdateStatusAtomicWithError performs atomic status update with error message
+	UpdateStatusAtomicWithError(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int, errorMsg string) error
 	Cancel(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
@@ -39,8 +45,8 @@ func NewEvaluationRepository(db *pgxpool.Pool) EvaluationRepository {
 // The database will auto-populate created_at and id via defaults
 func (r *PostgresEvaluationRepository) Create(ctx context.Context, eval *model.Evaluation) error {
 	query := `
-		INSERT INTO evaluations (id, model_id, dataset_ids, config, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO evaluations (id, model_id, dataset_ids, config, status, progress, version, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -65,6 +71,8 @@ func (r *PostgresEvaluationRepository) Create(ctx context.Context, eval *model.E
 		datasetIDs,
 		configJSON,
 		eval.Status,
+		eval.Progress,
+		eval.Version, // Initial version is 0 from model.Evaluation struct
 		eval.CreatedAt,
 		eval.UpdatedAt,
 	).Scan(&returnedID, &createdAt, &updatedAt)
@@ -84,7 +92,7 @@ func (r *PostgresEvaluationRepository) Create(ctx context.Context, eval *model.E
 // GetByID retrieves an evaluation by its ID
 func (r *PostgresEvaluationRepository) GetByID(ctx context.Context, id string) (*model.Evaluation, error) {
 	query := `
-		SELECT id, model_id, dataset_ids, config, status, progress, error_message,
+		SELECT id, model_id, dataset_ids, config, status, progress, version, error_message,
 		       created_at, updated_at, started_at, completed_at
 		FROM evaluations
 		WHERE id = $1
@@ -103,6 +111,7 @@ func (r *PostgresEvaluationRepository) GetByID(ctx context.Context, id string) (
 		&configJSON,
 		&eval.Status,
 		&eval.Progress,
+		&eval.Version,
 		&errorMessage,
 		&eval.CreatedAt,
 		&eval.UpdatedAt,
@@ -152,7 +161,7 @@ func (r *PostgresEvaluationRepository) List(ctx context.Context, page, limit int
 	}
 
 	query := `
-		SELECT id, model_id, dataset_ids, config, status, progress, error_message,
+		SELECT id, model_id, dataset_ids, config, status, progress, version, error_message,
 		       created_at, updated_at, started_at, completed_at
 		FROM evaluations
 		ORDER BY created_at DESC
@@ -180,6 +189,7 @@ func (r *PostgresEvaluationRepository) List(ctx context.Context, page, limit int
 			&configJSON,
 			&eval.Status,
 			&eval.Progress,
+			&eval.Version,
 			&errorMessage,
 			&eval.CreatedAt,
 			&eval.UpdatedAt,
@@ -325,4 +335,47 @@ func (r *PostgresEvaluationRepository) CountByStatus(ctx context.Context, status
 	}
 
 	return count, nil
+}
+
+// UpdateStatusAtomic performs an atomic status update with optimistic locking.
+// It only succeeds if the current version matches expectedVersion.
+// Returns ErrConcurrentModification if the version doesn't match.
+func (r *PostgresEvaluationRepository) UpdateStatusAtomic(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int) error {
+	return r.updateStatusAtomicInternal(ctx, id, expectedVersion, status, progress, "")
+}
+
+// UpdateStatusAtomicWithError performs atomic status update with error message
+func (r *PostgresEvaluationRepository) UpdateStatusAtomicWithError(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int, errorMsg string) error {
+	return r.updateStatusAtomicInternal(ctx, id, expectedVersion, status, progress, errorMsg)
+}
+
+// updateStatusAtomicInternal is the internal implementation for atomic status updates
+func (r *PostgresEvaluationRepository) updateStatusAtomicInternal(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int, errorMsg string) error {
+	query := `
+		UPDATE evaluations
+		SET status = $1, progress = $2, error_message = CASE WHEN $5 = '' THEN NULL ELSE $5 END, updated_at = CURRENT_TIMESTAMP, version = version + 1
+		WHERE id = $3 AND version = $4
+	`
+
+	result, err := r.db.Exec(ctx, query, status, progress, uuid.MustParse(id), expectedVersion, errorMsg)
+	if err != nil {
+		return fmt.Errorf("failed to atomic update status: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		// Check if evaluation exists
+		var currentVersion int
+		checkQuery := `SELECT version FROM evaluations WHERE id = $1`
+		err := r.db.QueryRow(ctx, checkQuery, uuid.MustParse(id)).Scan(&currentVersion)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return fmt.Errorf("evaluation not found: %s", id)
+			}
+			return fmt.Errorf("failed to check evaluation version: %w", err)
+		}
+		// Evaluation exists but version mismatch
+		return ErrConcurrentModification
+	}
+
+	return nil
 }

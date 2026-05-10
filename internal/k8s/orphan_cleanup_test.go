@@ -94,6 +94,31 @@ func (m *mockEvalRepo) UpdateStatusWithError(ctx context.Context, id string, sta
 	return nil
 }
 
+func (m *mockEvalRepo) UpdateStatusAtomic(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int) error {
+	if eval, ok := m.evaluations[id]; ok {
+		if eval.Version != expectedVersion {
+			return repository.ErrConcurrentModification
+		}
+		eval.Status = status
+		eval.Progress = progress
+		eval.Version++
+	}
+	return nil
+}
+
+func (m *mockEvalRepo) UpdateStatusAtomicWithError(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int, errorMsg string) error {
+	if eval, ok := m.evaluations[id]; ok {
+		if eval.Version != expectedVersion {
+			return repository.ErrConcurrentModification
+		}
+		eval.Status = status
+		eval.Progress = progress
+		eval.ErrorMessage = errorMsg
+		eval.Version++
+	}
+	return nil
+}
+
 // newMockLogger creates a logger for testing
 func newMockLogger() *slog.Logger {
 	return slog.Default()

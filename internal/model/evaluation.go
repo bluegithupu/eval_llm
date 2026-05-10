@@ -25,6 +25,7 @@ type Evaluation struct {
 	Config       map[string]any   `json:"config"`
 	Status       EvaluationStatus `json:"status"`
 	Progress     int              `json:"progress"`
+	Version      int              `json:"version"` // Optimistic lock version
 	ErrorMessage string           `json:"error_message,omitempty"`
 	CreatedAt    time.Time        `json:"created_at"`
 	UpdatedAt    time.Time        `json:"updated_at"`
