@@ -41,6 +41,7 @@ type JobEvent struct {
 	OOMDetected bool
 	OOMPodName  string
 	OOMExitCode int32
+	Stderr      string // Captured stderr from CLI execution for error debugging
 }
 
 // StatusUpdater is an interface for updating evaluation status

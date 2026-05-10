@@ -211,3 +211,49 @@ func TestInMemoryEventStore_InvalidEvent(t *testing.T) {
 	err = store.StoreEvent(ctx, event)
 	assert.Error(t, err)
 }
+
+func TestStoreError(t *testing.T) {
+	store := NewInMemoryEventStore()
+	ctx := context.Background()
+
+	evalID := "eval-store-error"
+	errorMsg := "OpenCompass CLI failed with exit code 1"
+	stderrOutput := "Error: dataset 'MMLU' not found\nTraceback (most recent call last):\n  File 'run.py', line 42, in main()"
+
+	err := store.StoreError(ctx, evalID, ErrorTypeOpenCompass, errorMsg, stderrOutput)
+	require.NoError(t, err)
+
+	// Verify the error event was stored with stderr
+	events, err := store.GetEvents(ctx, evalID)
+	require.NoError(t, err)
+	assert.Len(t, events, 1)
+
+	event := events[0]
+	assert.Equal(t, EventJobFailed, event.EventType)
+	assert.Equal(t, errorMsg, event.Message)
+	assert.Equal(t, stderrOutput, event.Stderr, "stderr should be stored in the event for debugging")
+}
+
+func TestStoreError_EmptyEvalID(t *testing.T) {
+	store := NewInMemoryEventStore()
+	ctx := context.Background()
+
+	err := store.StoreError(ctx, "", ErrorTypeOpenCompass, "error", "stderr")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "evalID is required")
+}
+
+func TestStoreError_EmptyStderr(t *testing.T) {
+	store := NewInMemoryEventStore()
+	ctx := context.Background()
+
+	evalID := "eval-empty-stderr"
+	err := store.StoreError(ctx, evalID, ErrorTypeK8sJobCreation, "Job creation failed", "")
+	require.NoError(t, err)
+
+	// Verify the event was stored with empty stderr
+	events, err := store.GetEvents(ctx, evalID)
+	require.NoError(t, err)
+	assert.Len(t, events, 1)
+	assert.Equal(t, "", events[0].Stderr)
+}

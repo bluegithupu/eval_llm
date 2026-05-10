@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/eval_llm/backend/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"log/slog"
 )
 
 // MockKubernetesClient mocks Kubernetes client operations
@@ -84,6 +86,16 @@ func (m *MockEvaluationRepository) Count(ctx context.Context) (int, error) {
 func (m *MockEvaluationRepository) CountByStatus(ctx context.Context, status model.EvaluationStatus) (int, error) {
 	args := m.Called(ctx, status)
 	return args.Int(0), args.Error(1)
+}
+
+func (m *MockEvaluationRepository) UpdateStatusAtomic(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int) error {
+	args := m.Called(ctx, id, expectedVersion, status, progress)
+	return args.Error(0)
+}
+
+func (m *MockEvaluationRepository) UpdateStatusAtomicWithError(ctx context.Context, id string, expectedVersion int, status model.EvaluationStatus, progress int, errorMsg string) error {
+	args := m.Called(ctx, id, expectedVersion, status, progress, errorMsg)
+	return args.Error(0)
 }
 
 // MockResultRepository for testing
@@ -406,10 +418,69 @@ func TestMarkFailedWithStderr(t *testing.T) {
 	mockEvalRepo := new(MockEvaluationRepository)
 	mockEventStore := new(MockEventStore)
 
-	// Note: This verifies the mock expectations are set up correctly
-	// Actual invocation would require a logger
-	mockEvalRepo.On("UpdateStatusWithError", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockEventStore.On("StoreError", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// Set up expectations for StoreError to be called with stderr
+	mockEventStore.On("StoreError", mock.Anything, "eval-123", monitor.ErrorTypeOpenCompass, "OpenCompass CLI failed", "Error: dataset not found").Return(nil)
+	mockEvalRepo.On("UpdateStatusWithError", mock.Anything, "eval-123", model.StatusFailed, 0, "OpenCompass CLI failed").Return(nil)
+
+	// Create a minimal orchestrator for testing with a logger
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	orchestrator := &Orchestrator{
+		evalRepo:   mockEvalRepo,
+		eventStore: mockEventStore,
+		logger:     logger,
+	}
+
+	// Call markFailedWithStderr directly
+	ctx := context.Background()
+	orchestrator.markFailedWithStderr(ctx, "eval-123", "OpenCompass CLI failed", "Error: dataset not found")
+
+	// Verify that both UpdateStatusWithError and StoreError were called with correct args
+	mockEvalRepo.AssertExpectations(t)
+	mockEventStore.AssertExpectations(t)
+}
+
+// TestMarkFailedWithStderr_EmptyStderr tests markFailedWithStderr with empty stderr
+func TestMarkFailedWithStderr_EmptyStderr(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+	mockEventStore := new(MockEventStore)
+
+	// Set up expectations with empty stderr
+	mockEventStore.On("StoreError", mock.Anything, "eval-456", monitor.ErrorTypeOpenCompass, "Job creation failed", "").Return(nil)
+	mockEvalRepo.On("UpdateStatusWithError", mock.Anything, "eval-456", model.StatusFailed, 0, "Job creation failed").Return(nil)
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	orchestrator := &Orchestrator{
+		evalRepo:   mockEvalRepo,
+		eventStore: mockEventStore,
+		logger:     logger,
+	}
+
+	ctx := context.Background()
+	orchestrator.markFailedWithStderr(ctx, "eval-456", "Job creation failed", "")
+
+	mockEvalRepo.AssertExpectations(t)
+	mockEventStore.AssertExpectations(t)
+}
+
+// TestMarkFailedWithStderr_NoEventStore tests behavior when eventStore is nil
+func TestMarkFailedWithStderr_NoEventStore(t *testing.T) {
+	mockEvalRepo := new(MockEvaluationRepository)
+
+	// Expect UpdateStatusWithError to still be called
+	mockEvalRepo.On("UpdateStatusWithError", mock.Anything, "eval-789", model.StatusFailed, 0, "Some error").Return(nil)
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	orchestrator := &Orchestrator{
+		evalRepo:   mockEvalRepo,
+		eventStore: nil, // No event store
+		logger:     logger,
+	}
+
+	ctx := context.Background()
+	// This should not panic even without eventStore
+	orchestrator.markFailedWithStderr(ctx, "eval-789", "Some error", "some stderr content")
+
+	mockEvalRepo.AssertExpectations(t)
 }
 
 // TestNewOrchestrator tests orchestrator creation

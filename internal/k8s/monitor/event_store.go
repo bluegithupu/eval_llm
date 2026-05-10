@@ -112,12 +112,8 @@ func (s *InMemoryEventStore) StoreError(ctx context.Context, evalID string, erro
 		EventType: EventJobFailed,
 		Message:   message,
 		Timestamp: time.Now(),
-		JobStatus: nil,
+		Stderr:    stderr, // Store stderr for debugging OpenCompass CLI errors
 	}
-
-	// Store stderr as part of the event (for debugging)
-	// In a real implementation, this might be stored in a separate field or log file
-	_ = stderr // Stored in memory for debugging purposes
 
 	return s.StoreEvent(ctx, event)
 }
